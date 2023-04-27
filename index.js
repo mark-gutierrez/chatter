@@ -1,72 +1,54 @@
-require("dotenv").config()
-require("express-async-errors")
-
-const path = require("node:path")
-const fs = require("node:fs")
-const { Buffer } = require("node:buffer")
-
-const cors = require("cors")
-const express = require("express")
-const app = express()
-
-const { Client } = require("pg")
-const client = new Client(process.env.DATABASE_URL)
-
-const { notFoundMiddleware, errorHandlerMiddleware } = require("./middleware")
-
-app.use(express.static(path.join(__dirname, "public")))
-app.use(express.urlencoded({ extended: true }))
-app.use(express.json())
-app.use(cors())
-
-app.get("/", async (req, res) => {
-    let file
-    try {
-        file = await fs.promises.open("./public/login-registration.html")
-        let staticFile = await file.readFile()
-        res.send(staticFile.toString())
-    } catch (error) {
-        throw new Error()
-    } finally {
-        return file.close()
-    }
+const fastify = require("fastify")({
+    logger: {
+        transport: {
+            target: "pino-pretty",
+        },
+    },
 })
 
-app.post(/(login|registration)/, async (req, res) => {
-    const { email, password } = req.body
-
-    if (!email || !password) {
-        return res.status(400).json({ msg: "Email or Password empty fields" })
-    }
-
-    return res.send(`${req.path}`)
+// plug-ins
+fastify.register(require("@fastify/formbody"))
+// fastify.register(require("@fastify/helmet"))
+fastify.register(require("@fastify/static"), {
+    root: require("node:path").join(__dirname, "public"),
 })
 
-app.get("/pg", async (req, res) => {
-    try {
-        const res = await client.query(
-            "CREATE TABLE session(sessionguid UUID NOT NULL, created text NOT NULL, sessionlife integer NOT NULL)"
-        )
-        console.log(res.rows[0])
-    } catch (err) {
-        console.log(err.stack)
-    }
-    res.send("hello")
+fastify.get("/", async function (request, reply) {
+    const home = await require("./services/file-reader")(
+        "login-registration.html"
+    )
+
+    reply.type("text/html").send(home)
 })
 
-app.use(notFoundMiddleware)
-app.use(errorHandlerMiddleware)
-
-const port = process.env.PORT || 3000
-const start = async () => {
+async function start() {
     try {
-        await client.connect()
-        app.listen(port, () => {
-            console.log(`listening on http://localhost:${port}`)
+        // async plug-ins
+        await fastify.register(require("@fastify/cors"))
+        await fastify.register(require("@fastify/compress"))
+        await fastify.register(require("@fastify/rate-limit"), {
+            max: 100,
+            timeWindow: "1 minute",
         })
-    } catch (error) {
-        console.error(error)
+        await fastify.register(
+            require("@fastify/env"),
+            require("./schemas/env")
+        )
+        fastify.register(require("@fastify/postgres"), {
+            connectionString: fastify.config.DATABASE_URL,
+        })
+        await fastify.listen({ port: fastify.config.PORT })
+    } catch (err) {
+        fastify.log.error(err)
+        process.exit(1)
     }
 }
+
+;["SIGINT", "SIGTERM"].forEach((signal) => {
+    process.on(signal, async () => {
+        await fastify.close()
+        process.exit(0)
+    })
+})
 
 start()
