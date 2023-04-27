@@ -5,6 +5,19 @@ function Offline() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [testPassword, setTestPassword] = useState("")
+    const [showPopUp, setShowPopUp] = useState(false)
+    const [popUpMessage, setPopUpMessage] = useState("false")
+
+    function showPopupHandler() {
+        setShowPopUp(true)
+    }
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowPopUp(false)
+        }, 7000)
+        return () => clearTimeout(timer)
+    }, [showPopUp])
 
     function handleLogin(e) {
         e.preventDefault()
@@ -17,13 +30,15 @@ function Offline() {
         e.preventDefault()
 
         if (!isEmail(email)) {
-            alert("Invalid Email")
+            setPopUpMessage("Invalid Email")
+            showPopupHandler()
             return
         }
         if (!isValidPassword(password, testPassword)) {
-            alert(
-                `Password does not match or does not contain at least: 8 characters and at most 20 characters, one digit, one upper case alphabet,one lower case alphabet, one special character which includes !@#$%&*()-+=^. It must not contain any white space.`
+            setPopUpMessage(
+                "Password must have minimum eight characters, at least one upper case letter, one lower case letter, one number and one special character"
             )
+            showPopupHandler()
             return
         }
 
@@ -40,21 +55,20 @@ function Offline() {
 
     function isValidPassword(pass_word, test_password) {
         // It contains at least:
-        // - 8 characters and at most 20 characters.
+        // - 8 characters
         // - one digit.
         // - one upper case alphabet.
         // - one lower case alphabet.
-        // - one special character which includes !@#$%&*()-+=^.
-        // It doesn’t contain any white space.
-        const regex =
-            /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&-+=()])(?=\\S+$).{8, 20}$/
-        return regex.test(String(pass_word)) && pass_word === test_password
+        // - one special character which includes #?!@$ %^&*-.
+        const regexp =
+            /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$ %^&*-]).{8,}$/
+        return regexp.test(String(pass_word)) && pass_word === test_password
     }
 
     return (
         <div>
             <h1>{page ? "Login" : "Register"}</h1>
-
+            {showPopUp && <p>{popUpMessage}</p>}
             <form onSubmit={page ? handleLogin : handleRegister}>
                 <input
                     type="email"
