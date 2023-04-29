@@ -33,7 +33,7 @@ class Query {
         if (method === "GET") this.#get(entity, query)
         if (method === "POST") this.#post(entity, body)
         if (method === "PATCH") this.#patch(entity, id, body)
-        if (method === "DELETE") this.#delete(entity, id, body)
+        if (method === "DELETE") this.#delete(entity, id)
         return this.#query + ";"
     }
 
@@ -43,7 +43,7 @@ class Query {
         this.#push(`from ${entity}`)
         this.#where(this.#entity[entity], query)
         this.#sort(query)
-        this.#paginate(query)
+        // this.#paginate(query)
     }
 
     #post(entity, body) {
@@ -64,7 +64,7 @@ class Query {
         this.#push(` RETURNING * `)
     }
 
-    #delete(entity, id, body) {
+    #delete(entity, id) {
         this.#query = `DELETE FROM ${entity} WHERE ${this.#singularize(
             entity
         )}_uid = ${id}`

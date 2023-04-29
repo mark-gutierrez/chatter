@@ -62,7 +62,7 @@ ALTER TABLE Messages
     await client.connect()
     try {
         const rows = await client.query(
-            "UPDATE users SET email='robert.alexander@gmail.com', password='Robert1234!', username='RobertAB' WHERE user_uid = 'b450999d-3255-47a6-abb8-23859e4bfcd6' RETURNING *;"
+            "INSERT INTO users (user_uid, dateTime, email, password, username) values (uuid_generate_v4(), now(), 'mark.gtrez@gmail.com', 'Mark1234!', 'MarkGG') RETURNING * ;"
         )
         console.log(rows)
     } catch (err) {

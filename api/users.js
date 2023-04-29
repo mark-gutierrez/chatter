@@ -4,40 +4,52 @@ module.exports = function (fastify, opts, done) {
     fastify.get(
         "/",
         {
-            querystring: {
-                type: "object",
-                properties: {
-                    user_uid: { type: "string" },
-                    email: { type: "string" },
-                    password: { type: "string" },
-                    dateTime: { type: "string" },
-                    username: { type: "string" },
+            schema: {
+                querystring: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                        user_uid: { type: "string" },
+                        email: { type: "string" },
+                        password: { type: "string" },
+                        datetime: { type: "string" },
+                        username: { type: "string" },
+                        select: { type: "string" },
+                        sort: { type: "string" },
+                        page: { type: "number" },
+                        limit: { type: "number" },
+                    },
+                },
+                response: {
+                    200: {
+                        type: "object",
+                        properties: {
+                            ok: {
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    properties: {
+                                        user_uid: { type: "string" },
+                                        email: { type: "string" },
+                                        password: { type: "string" },
+                                        datetime: { type: "string" },
+                                        username: { type: "string" },
+                                    },
+                                },
+                            },
+                        },
+                    },
                 },
             },
-            // response: {
-            //     200: {
-            //         type: "object",
-            //         properties: {
-            //             user_uid: { type: "string" },
-            //             email: { type: "string" },
-            //             password: { type: "string" },
-            //             dateTime: { type: "string" },
-            //             username: { type: "string" },
-            //         },
-            //     },
-            // },
         },
         async function (request, reply) {
-            // const client = await fastify.pg.connect()
-            // try {
-            //     const { rows } = await client.query("SELECT * FROM users;")
-
-            //     return rows
-            // } finally {
-            //     client.release()
-            // }
-
-            return { ok: Query.get().build(request) }
+            const client = await fastify.pg.connect()
+            try {
+                const { rows } = await client.query(Query.get().build(request))
+                reply.send({ ok: rows })
+            } finally {
+                client.release()
+            }
         }
     )
 
