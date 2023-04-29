@@ -24,6 +24,7 @@
     "@fastify/env": "^4.2.0",
     "@fastify/formbody": "^7.4.0",
     "@fastify/helmet": "^10.1.0",
+    "@fastify/multipart": "^7.6.0",
     "@fastify/postgres": "^5.2.0",
     "@fastify/rate-limit": "^8.0.0",
     "@fastify/static": "^6.10.1",

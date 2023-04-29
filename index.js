@@ -8,10 +8,12 @@ const fastify = require("fastify")({
 
 // plug-ins
 fastify.register(require("@fastify/formbody"))
+fastify.register(require("@fastify/multipart"))
 // fastify.register(require("@fastify/helmet"))
 fastify.register(require("@fastify/static"), {
     root: require("node:path").join(__dirname, "public"),
 })
+fastify.register(require("./api/users"), { prefix: "/v1/users" })
 
 fastify.get("/", async function (request, reply) {
     const home = await require("./services/file-reader")(
