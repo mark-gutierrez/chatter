@@ -61,8 +61,10 @@ ALTER TABLE Messages
 ;(async () => {
     await client.connect()
     try {
-        const results = await client.query(query)
-        console.log(results)
+        const rows = await client.query(
+            "UPDATE users SET email='robert.alexander@gmail.com', password='Robert1234!', username='RobertAB' WHERE user_uid = 'b450999d-3255-47a6-abb8-23859e4bfcd6' RETURNING *;"
+        )
+        console.log(rows)
     } catch (err) {
         console.error("error executing query:", err)
     } finally {
