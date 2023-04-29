@@ -24,7 +24,7 @@ module.exports = function (fastify, opts, done) {
                     200: {
                         type: "object",
                         properties: {
-                            ok: {
+                            data: {
                                 type: "array",
                                 items: {
                                     type: "object",
@@ -46,30 +46,79 @@ module.exports = function (fastify, opts, done) {
             const client = await fastify.pg.connect()
             try {
                 const { rows } = await client.query(Query.get().build(request))
-                reply.send({ ok: rows })
+                reply.send({ data: rows })
             } finally {
                 client.release()
             }
         }
     )
 
-    fastify.post("/", async function (request, reply) {
-        // const client = await fastify.pg.connect()
-        // const {
-        //     body: { email, password, username },
-        // } = request
+    fastify.post(
+        "/",
+        {
+            schema: {
+                body: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["email", "password", "username"],
+                    properties: {
+                        email: { type: "string" },
+                        password: { type: "string" },
+                        username: { type: "string" },
+                    },
+                },
+                response: {
+                    201: {
+                        type: "object",
+                        properties: {
+                            data: {
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    additionalProperties: false,
+                                    properties: {
+                                        user_uid: { type: "string" },
+                                        email: { type: "string" },
+                                        datetime: { type: "string" },
+                                        username: { type: "string" },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    409: {
+                        type: "object",
+                        properties: {
+                            error: { type: "string" },
+                        },
+                    },
+                },
+            },
+        },
 
-        // try {
-        //     const { rows } = await client.query(
-        //         `INSERT into users (user_uid, email, password, username, datetime) values (uuid_generate_v4() ,'${email}','${password}','${username}', now());`
-        //     )
-        //     return rows
-        // } finally {
-        //     client.release()
-        // }
+        async function (request, reply) {
+            const obj = await fastify.pg.transact(async (client) => {
+                const user = await client.query(
+                    `SELECT * FROM users WHERE email = '${request.body.email}';`
+                )
+                if (user.rows.length > 0) return []
 
-        return { ok: Query.get().build(request) }
-    })
+                request.body.password = await fastify.bcrypt.hash(
+                    request.body.password
+                )
+
+                const { rows } = await client.query(Query.get().build(request))
+
+                return rows
+            })
+
+            if (obj.length === 0) {
+                reply.code(409).send({ error: "email account already exists" })
+            } else {
+                reply.code(201).send({ data: obj })
+            }
+        }
+    )
 
     fastify.patch("/:id", async function (request, reply) {
         console.log(request)

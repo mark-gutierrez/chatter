@@ -43,7 +43,7 @@ class Query {
         this.#push(`from ${entity}`)
         this.#where(this.#entity[entity], query)
         this.#sort(query)
-        // this.#paginate(query)
+        this.#paginate(query)
     }
 
     #post(entity, body) {
