@@ -1,46 +1,11 @@
 const Query = require("../services/query-builder")
+const { users, getSchema, postSchema } = require("../schemas/routes")
 
 module.exports = function (fastify, opts, done) {
     fastify.get(
         "/",
         {
-            schema: {
-                querystring: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                        user_uid: { type: "string" },
-                        email: { type: "string" },
-                        password: { type: "string" },
-                        datetime: { type: "string" },
-                        username: { type: "string" },
-                        select: { type: "string" },
-                        sort: { type: "string" },
-                        page: { type: "number" },
-                        limit: { type: "number" },
-                    },
-                },
-                response: {
-                    200: {
-                        type: "object",
-                        properties: {
-                            data: {
-                                type: "array",
-                                items: {
-                                    type: "object",
-                                    properties: {
-                                        user_uid: { type: "string" },
-                                        email: { type: "string" },
-                                        password: { type: "string" },
-                                        datetime: { type: "string" },
-                                        username: { type: "string" },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
+            schema: getSchema(users, ["password"]),
         },
         async function (request, reply) {
             const client = await fastify.pg.connect()
@@ -56,44 +21,11 @@ module.exports = function (fastify, opts, done) {
     fastify.post(
         "/",
         {
-            schema: {
-                body: {
-                    type: "object",
-                    additionalProperties: false,
-                    required: ["email", "password", "username"],
-                    properties: {
-                        email: { type: "string" },
-                        password: { type: "string" },
-                        username: { type: "string" },
-                    },
-                },
-                response: {
-                    201: {
-                        type: "object",
-                        properties: {
-                            data: {
-                                type: "array",
-                                items: {
-                                    type: "object",
-                                    additionalProperties: false,
-                                    properties: {
-                                        user_uid: { type: "string" },
-                                        email: { type: "string" },
-                                        datetime: { type: "string" },
-                                        username: { type: "string" },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    409: {
-                        type: "object",
-                        properties: {
-                            error: { type: "string" },
-                        },
-                    },
-                },
-            },
+            schema: postSchema(
+                users,
+                ["email", "password", "username"],
+                ["user_uid", "datetime"]
+            ),
         },
 
         async function (request, reply) {
@@ -102,6 +34,9 @@ module.exports = function (fastify, opts, done) {
                     `SELECT * FROM users WHERE email = '${request.body.email}';`
                 )
                 if (user.rows.length > 0) return []
+
+                console.log(request.body)
+                console.log(users)
 
                 request.body.password = await fastify.bcrypt.hash(
                     request.body.password

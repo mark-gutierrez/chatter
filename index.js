@@ -14,6 +14,7 @@ fastify.register(require("fastify-bcrypt"))
 fastify.register(require("@fastify/static"), {
     root: require("node:path").join(__dirname, "public"),
 })
+
 fastify.register(require("./api/users"), { prefix: "/v1/users" })
 
 fastify.get("/", async function (request, reply) {
