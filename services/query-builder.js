@@ -67,7 +67,7 @@ class Query {
     #delete(entity, id) {
         this.#query = `DELETE FROM ${entity} WHERE ${this.#singularize(
             entity
-        )}_uid = ${id}`
+        )}_uid = '${id}' RETURNING * `
     }
 
     #genUpdateString(entity, id, body) {

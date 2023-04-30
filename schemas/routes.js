@@ -79,9 +79,75 @@ function postSchema(model, requirements = [], remove = []) {
     }
 }
 
+function patchSchema(model, remove = []) {
+    return {
+        params: {
+            type: "object",
+            required: ["id"],
+            properties: {
+                id: { type: "string" },
+            },
+        },
+        body: {
+            type: "object",
+            additionalProperties: false,
+            properties: removeProperty(model(), remove),
+        },
+        response: {
+            200: {
+                type: "object",
+                properties: {
+                    data: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            additionalProperties: false,
+                            properties: model(),
+                        },
+                    },
+                },
+            },
+            409: {
+                type: "object",
+                properties: {
+                    error: { type: "string" },
+                },
+            },
+        },
+    }
+}
+
+function deleteSchema(model) {
+    return {
+        params: {
+            type: "object",
+            required: ["id"],
+            properties: {
+                id: { type: "string" },
+            },
+        },
+        response: {
+            200: {
+                type: "object",
+                properties: {
+                    data: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            additionalProperties: false,
+                            properties: model(),
+                        },
+                    },
+                },
+            },
+        },
+    }
+}
+
 module.exports = {
     users,
-    removeProperty,
     getSchema,
     postSchema,
+    patchSchema,
+    deleteSchema,
 }
