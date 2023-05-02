@@ -19,14 +19,35 @@ function Offline() {
         return () => clearTimeout(timer)
     }, [showPopUp])
 
-    function handleLogin(e) {
-        e.preventDefault()
-        console.log("login")
-        console.log(email)
-        console.log(password)
+    async function postData(url = "", data = {}) {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        })
+        return response.json()
     }
 
-    function handleRegister(e) {
+    async function handleLogin(e) {
+        e.preventDefault()
+        const { data, error } = await postData("/login", {
+            email: `${email.toLowerCase()}`,
+            password,
+        })
+
+        if (error) {
+            setPopUpMessage(error)
+            showPopupHandler()
+        }
+
+        if (data) {
+            window.location.replace("/")
+        }
+    }
+
+    async function handleRegister(e) {
         e.preventDefault()
 
         if (!isEmail(email)) {
@@ -42,9 +63,22 @@ function Offline() {
             return
         }
 
-        console.log("register")
-        console.log(email)
-        console.log(password)
+        const { data, error } = await postData("/register", {
+            email: `${email.toLowerCase()}`,
+            password,
+            username: `${email.split("@")[0]}`,
+        })
+
+        if (error) {
+            setPopUpMessage(error)
+            showPopupHandler()
+        }
+
+        if (data) {
+            setPage(!page)
+            setPopUpMessage("Successful Regristration!")
+            showPopupHandler()
+        }
     }
 
     function isEmail(e_mail) {

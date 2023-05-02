@@ -6,26 +6,13 @@ const fastify = require("fastify")({
     },
 })
 
-// plug-ins
-fastify.register(require("@fastify/formbody"))
-fastify.register(require("@fastify/multipart"))
-fastify.register(require("fastify-bcrypt"))
 // fastify.register(require("@fastify/helmet"))
-fastify.register(require("@fastify/static"), {
-    root: require("node:path").join(__dirname, "public"),
-})
-
-fastify.get("/", async function (request, reply) {
-    const home = await require("./services/file-reader")(
-        "login-registration.html"
-    )
-
-    reply.type("text/html").send(home)
-})
 
 async function start() {
     try {
-        // async plug-ins
+        // plug-ins
+        fastify.register(require("@fastify/formbody"))
+        fastify.register(require("@fastify/multipart"))
         await fastify.register(require("@fastify/cors"))
         await fastify.register(require("@fastify/compress"))
         await fastify.register(require("@fastify/rate-limit"), {
@@ -36,25 +23,40 @@ async function start() {
             require("@fastify/env"),
             require("./schemas/env")
         )
+        fastify.register(require("@fastify/cookie"))
+        fastify.register(require("@fastify/session"), {
+            secret: fastify.config.SESSION_SECRET,
+            cookie: { secure: false },
+            expires: 3600000,
+        })
+
+        // public routes
+        fastify.register(require("@fastify/static"), {
+            root: require("node:path").join(__dirname, "public"),
+        })
+
+        // web routes
+        fastify.register(require("./web/offline"))
+
+        // api routes
         await fastify.register(
             require("@fastify/swagger"),
             require("./schemas/swagger")
         )
-        // api routes
         await fastify.register(require("@fastify/swagger-ui"))
         fastify.register(require("./api"), { prefix: "/v1" })
 
+        // connect to DB
         fastify.register(require("@fastify/postgres"), {
             connectionString: fastify.config.DATABASE_URL,
         })
-        await fastify.ready().then(
-            () => {
-                fastify.swagger()
-            },
-            (err) => {
-                console.log("an error happened", err)
+
+        fastify.ready((err) => {
+            if (err) {
+                console.error(err)
             }
-        )
+            fastify.swagger()
+        })
         await fastify.listen({ port: fastify.config.PORT })
     } catch (err) {
         fastify.log.error(err)

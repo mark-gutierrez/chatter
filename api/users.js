@@ -1,4 +1,5 @@
 const Query = require("../services/query-builder")
+const Encrypt = require("../services/encrypt")
 const {
     users,
     getSchema,
@@ -25,7 +26,7 @@ module.exports = function (fastify, opts, done) {
             )
             if (user.rows.length > 0) return []
 
-            request.body.password = await fastify.bcrypt.hash(
+            request.body.password = await Encrypt.get().hash(
                 request.body.password
             )
 

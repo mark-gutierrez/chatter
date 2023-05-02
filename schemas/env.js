@@ -15,6 +15,9 @@ module.exports = {
             DB_PASSWORD: {
                 type: "string",
             },
+            SESSION_SECRET: {
+                type: "string",
+            },
         },
     },
     dotenv: {
