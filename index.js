@@ -15,8 +15,6 @@ fastify.register(require("@fastify/static"), {
     root: require("node:path").join(__dirname, "public"),
 })
 
-fastify.register(require("./api/users"), { prefix: "/v1/users" })
-
 fastify.get("/", async function (request, reply) {
     const home = await require("./services/file-reader")(
         "login-registration.html"
@@ -38,9 +36,25 @@ async function start() {
             require("@fastify/env"),
             require("./schemas/env")
         )
+        await fastify.register(
+            require("@fastify/swagger"),
+            require("./schemas/swagger")
+        )
+        // api routes
+        await fastify.register(require("@fastify/swagger-ui"))
+        fastify.register(require("./api"), { prefix: "/v1" })
+
         fastify.register(require("@fastify/postgres"), {
             connectionString: fastify.config.DATABASE_URL,
         })
+        await fastify.ready().then(
+            () => {
+                fastify.swagger()
+            },
+            (err) => {
+                console.log("an error happened", err)
+            }
+        )
         await fastify.listen({ port: fastify.config.PORT })
     } catch (err) {
         fastify.log.error(err)

@@ -29,7 +29,7 @@ class Query {
 
     build({ query, body, method, routerPath, params: { id } }) {
         this.#query = ""
-        const entity = this.#urlParse(method, routerPath)
+        const entity = this.#urlParse(routerPath)
         if (method === "GET") this.#get(entity, query)
         if (method === "POST") this.#post(entity, body)
         if (method === "PATCH") this.#patch(entity, id, body)
@@ -115,10 +115,11 @@ class Query {
         )
     }
 
-    #urlParse(method, url) {
+    #urlParse(url) {
         let list = this.#stringToList(url, "/")
-        if (method === "GET" || method === "POST") return list[list.length - 1]
-        return list[list.length - 2]
+        return list.filter((element) =>
+            Object.keys(this.#entity).includes(element)
+        )[0]
     }
 
     #where(fields, query) {
