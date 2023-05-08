@@ -29,6 +29,10 @@ async function start() {
             cookie: { secure: false },
             expires: 3600000,
         })
+        fastify.register(require("@fastify/websocket"), {
+            handle: (conn, req) => conn.pipe(conn),
+            options: { maxPayload: 1048576 },
+        })
 
         // public routes
         fastify.register(require("@fastify/static"), {
@@ -37,6 +41,7 @@ async function start() {
 
         // web routes
         fastify.register(require("./web/offline"))
+        fastify.register(require("./web/online"))
 
         // api routes
         await fastify.register(
@@ -50,6 +55,7 @@ async function start() {
         fastify.register(require("@fastify/postgres"), {
             connectionString: fastify.config.DATABASE_URL,
         })
+        fastify.register(require("./services/build-db"))
 
         fastify.ready((err) => {
             if (err) {

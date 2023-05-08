@@ -1,20 +1,6 @@
 const Encrypt = require("../services/encrypt")
 
 module.exports = function (fastify, opts, done) {
-    fastify.get("/", async function (request, reply) {
-        let home = ""
-
-        if (request.session.user) {
-            home = await require("../services/file-reader")("chatter.html")
-        } else {
-            home = await require("../services/file-reader")(
-                "login-registration.html"
-            )
-        }
-
-        reply.type("text/html").send(home)
-    })
-
     fastify.post("/register", async function (request, reply) {
         let { email, password, username } = request.body
 
@@ -25,7 +11,6 @@ module.exports = function (fastify, opts, done) {
             if (user.rows.length > 0) return []
 
             password = await Encrypt.get().hash(password)
-            console.log(password)
 
             const { rows } = await client.query(
                 `INSERT INTO users(user_uid, email, password, username, datetime) VALUES (uuid_generate_v4(), '${email}', '${password}', '${username}', now()) RETURNING *;`
