@@ -1,14 +1,14 @@
-class Query {
+class RouteQuery {
     static #instance
     #entity
     #query
 
     static get() {
-        if (!Query.#instance) {
-            Query.#instance = new Query()
-            Query.#instance.initializeProperties()
+        if (!RouteQuery.#instance) {
+            RouteQuery.#instance = new RouteQuery()
+            RouteQuery.#instance.initializeProperties()
         }
-        return Query.#instance
+        return RouteQuery.#instance
     }
 
     initializeProperties() {
@@ -195,4 +195,4 @@ class Query {
     }
 }
 
-module.exports = Query
+module.exports = RouteQuery
