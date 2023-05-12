@@ -1,11 +1,3 @@
-function entityBuild(model) {
-    let obj = {}
-    Object.keys(model).forEach((key) => {
-        obj[key] = model[key]()
-    })
-    return obj
-}
-
 class Query {
     #model
     #fields
@@ -111,7 +103,7 @@ class Query {
     }
 
     offset(skip = 0) {
-        this.query = `${this.query} OFFEST ${skip}`
+        this.query = `${this.query} OFFSET ${skip}`
         return this
     }
 
@@ -120,7 +112,7 @@ class Query {
         let values = []
         for (const [key, value] of Object.entries(obj)) {
             fields.push(key)
-            values.push(`"${value}"`)
+            values.push(`'${value}'`)
         }
 
         return `(${this.#listToString(fields)}) VALUES (${this.#listToString(
@@ -184,9 +176,21 @@ class Query {
         return query.join(delimiter)
     }
 
+    getEntities() {
+        return Object.keys(this.#entities)
+    }
+
     eval() {
         return this.query + ";"
     }
+}
+
+function entityBuild(model) {
+    let obj = {}
+    Object.keys(model).forEach((key) => {
+        obj[key] = model[key]()
+    })
+    return obj
 }
 
 module.exports = Query

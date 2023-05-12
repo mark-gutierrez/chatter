@@ -1,34 +1,18 @@
-function users() {
+function authSchema(model, requirements = [], remove = []) {
     return {
-        user_uid: { type: "string" },
-        email: { type: "string" },
-        password: { type: "string" },
-        datetime: { type: "string" },
-        username: { type: "string" },
-    }
-}
-
-function conversations() {
-    return {
-        conversation_uid: { type: "string" },
-        datetime: { type: "string" },
-    }
-}
-
-function user_conversation() {
-    return {
-        user_uid: { type: "string" },
-        conversation_uid: { type: "string" },
-    }
-}
-
-function messages() {
-    return {
-        message_uid: { type: "string" },
-        text: { type: "string" },
-        dateTime: { type: "string" },
-        user_uid: { type: "string" },
-        conversation_uid: { type: "string" },
+        body: {
+            type: "object",
+            additionalProperties: false,
+            required: requirements,
+            properties: removeProperty(model(), remove),
+        },
+        response: {
+            "2xx": {
+                type: "object",
+                additionalProperties: false,
+                properties: { ...model(), token: { type: "string" } },
+            },
+        },
     }
 }
 
@@ -42,6 +26,13 @@ function removeProperty(obj, list = []) {
 
 function getSchema(model, remove = []) {
     return {
+        headers: {
+            type: "object",
+            properties: {
+                Authorization: { type: "string" },
+            },
+            required: ["Authorization"],
+        },
         querystring: {
             type: "object",
             additionalProperties: false,
@@ -73,6 +64,13 @@ function getSchema(model, remove = []) {
 
 function postSchema(model, requirements = [], remove = []) {
     return {
+        headers: {
+            type: "object",
+            properties: {
+                Authorization: { type: "string" },
+            },
+            required: ["Authorization"],
+        },
         body: {
             type: "object",
             additionalProperties: false,
@@ -82,22 +80,8 @@ function postSchema(model, requirements = [], remove = []) {
         response: {
             201: {
                 type: "object",
-                properties: {
-                    data: {
-                        type: "array",
-                        items: {
-                            type: "object",
-                            additionalProperties: false,
-                            properties: model(),
-                        },
-                    },
-                },
-            },
-            409: {
-                type: "object",
-                properties: {
-                    error: { type: "string" },
-                },
+                additionalProperties: false,
+                properties: model(),
             },
         },
     }
@@ -105,6 +89,13 @@ function postSchema(model, requirements = [], remove = []) {
 
 function patchSchema(model, remove = []) {
     return {
+        headers: {
+            type: "object",
+            properties: {
+                Authorization: { type: "string" },
+            },
+            required: ["Authorization"],
+        },
         params: {
             type: "object",
             required: ["id"],
@@ -120,22 +111,8 @@ function patchSchema(model, remove = []) {
         response: {
             200: {
                 type: "object",
-                properties: {
-                    data: {
-                        type: "array",
-                        items: {
-                            type: "object",
-                            additionalProperties: false,
-                            properties: model(),
-                        },
-                    },
-                },
-            },
-            409: {
-                type: "object",
-                properties: {
-                    error: { type: "string" },
-                },
+                additionalProperties: false,
+                properties: model(),
             },
         },
     }
@@ -143,6 +120,13 @@ function patchSchema(model, remove = []) {
 
 function deleteSchema(model) {
     return {
+        headers: {
+            type: "object",
+            properties: {
+                Authorization: { type: "string" },
+            },
+            required: ["Authorization"],
+        },
         params: {
             type: "object",
             required: ["id"],
@@ -153,26 +137,15 @@ function deleteSchema(model) {
         response: {
             200: {
                 type: "object",
-                properties: {
-                    data: {
-                        type: "array",
-                        items: {
-                            type: "object",
-                            additionalProperties: false,
-                            properties: model(),
-                        },
-                    },
-                },
+                additionalProperties: false,
+                properties: model(),
             },
         },
     }
 }
 
 module.exports = {
-    users,
-    conversations,
-    user_conversation,
-    messages,
+    authSchema,
     getSchema,
     postSchema,
     patchSchema,

@@ -18,6 +18,9 @@ module.exports = {
             SESSION_SECRET: {
                 type: "string",
             },
+            JWT_SECRET: {
+                type: "string",
+            },
         },
     },
     dotenv: {

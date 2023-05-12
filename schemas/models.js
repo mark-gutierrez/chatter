@@ -26,7 +26,7 @@ function messages() {
     return {
         message_uid: { type: "string" },
         text: { type: "string" },
-        dateTime: { type: "string" },
+        datetime: { type: "string" },
         user_uid: { type: "string" },
         conversation_uid: { type: "string" },
     }

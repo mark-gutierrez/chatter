@@ -1,5 +1,3 @@
-const Encrypt = require("../services/encrypt")
-
 module.exports = function (fastify, opts, done) {
     fastify.post("/register", async function (request, reply) {
         let { email, password, username } = request.body
@@ -10,7 +8,7 @@ module.exports = function (fastify, opts, done) {
             )
             if (user.rows.length > 0) return []
 
-            password = await Encrypt.get().hash(password)
+            password = await fastify.bcrypt.hash(password)
 
             const { rows } = await client.query(
                 `INSERT INTO users(user_uid, email, password, username, datetime) VALUES (uuid_generate_v4(), '${email}', '${password}', '${username}', now()) RETURNING *;`
@@ -36,7 +34,7 @@ module.exports = function (fastify, opts, done) {
 
             if (user.rows.length === 0) return []
 
-            const match = await Encrypt.get().compare(
+            const match = await fastify.bcrypt.compare(
                 password,
                 user.rows[0].password
             )

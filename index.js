@@ -29,10 +29,12 @@ async function start() {
             cookie: { secure: false },
             expires: 3600000,
         })
+        fastify.register(require("fastify-bcrypt"))
         fastify.register(require("@fastify/websocket"), {
             handle: (conn, req) => conn.pipe(conn),
             options: { maxPayload: 1048576 },
         })
+        fastify.register(require("./services/jwt"))
 
         // public routes
         fastify.register(require("@fastify/static"), {
