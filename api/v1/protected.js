@@ -3,14 +3,14 @@ const {
     conversations,
     user_conversation,
     messages,
-} = require("../schemas/models")
+} = require("../../schemas/models")
 
 const {
     getSchema,
     postSchema,
     patchSchema,
     deleteSchema,
-} = require("../schemas/routes")
+} = require("../../schemas/routes")
 
 module.exports = function (fastify, opts, done) {
     // Users route

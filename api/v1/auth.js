@@ -1,6 +1,6 @@
-const { UnauthenticatedError } = require("../errors")
-const { users } = require("../schemas/models")
-const { authSchema } = require("../schemas/routes")
+const { UnauthenticatedError } = require("../../errors")
+const { users } = require("../../schemas/models")
+const { authSchema } = require("../../schemas/routes")
 
 module.exports = function (fastify, opts, done) {
     fastify.post(

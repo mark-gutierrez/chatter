@@ -157,6 +157,7 @@ class QueryBuilder {
 
     #filter(obj, delimiter = ", ") {
         let { datetime, ...rest } = obj
+
         let query = []
         for (const [key, value] of Object.entries(rest)) {
             query.push(`${key} = '${value}'`)
@@ -169,9 +170,9 @@ class QueryBuilder {
                 gte: ">=",
                 lt: "<",
                 lte: "<=",
-                eq: "=",
             }
             datetime = JSON.parse(datetime)
+
             for (const [key, value] of Object.entries(datetime)) {
                 dateTimeQuery.push(
                     `datetime ${dateTimeFilters[key]} '${value}'`
@@ -179,6 +180,7 @@ class QueryBuilder {
             }
             query = [...query, ...dateTimeQuery]
         }
+        console.log(query)
 
         return query.join(delimiter)
     }

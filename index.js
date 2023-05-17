@@ -50,12 +50,15 @@ async function start() {
         fastify.register(require("./web/online"))
 
         // api routes
-        await fastify.register(
-            require("@fastify/swagger"),
-            require("./schemas/swagger")
-        )
+        fastify.register(require("./api"), { prefix: "/api" })
+
+        await fastify.register(require("@fastify/swagger"), {
+            mode: "static",
+            specification: {
+                path: "./files/swagger-api-v1.yaml",
+            },
+        })
         await fastify.register(require("@fastify/swagger-ui"))
-        fastify.register(require("./api"), { prefix: "/v1" })
 
         // connect to DB
         fastify.register(require("@fastify/postgres"), {
