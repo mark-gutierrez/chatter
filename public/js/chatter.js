@@ -9,7 +9,7 @@ function Online() {
     const [username, setUsername] = useState()
 
     socket.onopen = (event) => {
-        socket.send({ type: "init" })
+        socket.send(JSON.stringify({ type: "init" }))
     }
 
     socket.addEventListener("message", (message) => {

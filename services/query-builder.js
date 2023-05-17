@@ -1,4 +1,6 @@
-class Query {
+const fp = require("fastify-plugin")
+
+class QueryBuilder {
     #model
     #fields
     #entities
@@ -13,7 +15,7 @@ class Query {
     model(model) {
         this.query = ""
         const fields = this.#entities[model]
-        if (!fields) throw new Error("Invalid model")
+        if (!fields) throw new Error("Model does not exist")
         this.#model = model
         this.#fields = fields
         return this
@@ -22,7 +24,7 @@ class Query {
     find(obj = {}) {
         this.#isValidFields(obj, "find")
         this.query = `SELECT * FROM ${this.#model}`
-        if (Object.keys(obj).length > 0) {
+        if (!this.#isObjectEmpty(obj)) {
             this.where(obj)
         }
         return this
@@ -31,17 +33,15 @@ class Query {
     insert(obj = {}) {
         this.#isValidFields(obj, "insert")
         const init = `INSERT INTO ${this.#model}`
-        this.query =
-            Object.keys(obj).length === 0
-                ? `${init} DEFAULT VALUES`
-                : `${init} ${this.#genInsert(obj)}`
+        this.query = this.#isObjectEmpty(obj)
+            ? `${init} DEFAULT VALUES`
+            : `${init} ${this.#genInsert(obj)}`
         return this
     }
 
     update(obj = {}) {
         this.#isValidFields(obj, "update")
-        if (Object.keys(obj).length === 0)
-            throw new Error("Empty object to update")
+        if (this.#isObjectEmpty(obj)) throw new Error("Empty object to update")
         this.query = `UPDATE ${this.#model} SET ${this.#filter(obj)}`
         return this
     }
@@ -55,10 +55,9 @@ class Query {
 
     where(obj = {}) {
         this.#isValidFields(obj, "where")
-        const whereQuery =
-            Object.keys(obj).length > 0
-                ? `WHERE ${this.#filter(obj, " AND ")}`
-                : ""
+        const whereQuery = !this.#isObjectEmpty(obj)
+            ? `WHERE ${this.#filter(obj, " AND ")}`
+            : ""
         this.query = `${this.query} ${whereQuery}`
         return this
     }
@@ -107,6 +106,10 @@ class Query {
         return this
     }
 
+    #isObjectEmpty(obj = {}) {
+        return Object.keys(obj).length === 0
+    }
+
     #genInsert(obj = {}) {
         let fields = []
         let values = []
@@ -136,16 +139,20 @@ class Query {
 
     #isValidListFields(list = []) {
         for (let i = 0; i < list.length; i++) {
-            if (!Object.keys(this.#fields).includes(list[i])) return false
+            if (!this.#hasFieldsInModel(list[i])) return false
         }
         return true
     }
 
     #isValidObjFields(obj = {}) {
         for (const [key, value] of Object.entries(obj)) {
-            if (!Object.keys(this.#fields).includes(key)) return false
+            if (!this.#hasFieldsInModel(key)) return false
         }
         return true
+    }
+
+    #hasFieldsInModel(item = "") {
+        return Object.keys(this.#fields).includes(item)
     }
 
     #filter(obj, delimiter = ", ") {
@@ -185,7 +192,7 @@ class Query {
     }
 }
 
-function entityBuild(model) {
+function entityBuild(model = {}) {
     let obj = {}
     Object.keys(model).forEach((key) => {
         obj[key] = model[key]()
@@ -193,4 +200,25 @@ function entityBuild(model) {
     return obj
 }
 
-module.exports = Query
+class QuerySingleton {
+    static #instance
+    #builder
+
+    static get() {
+        if (!QuerySingleton.#instance) {
+            QuerySingleton.#instance = new QuerySingleton()
+            QuerySingleton.#instance.initializeProperties()
+        }
+        return QuerySingleton.#instance.#builder
+    }
+
+    initializeProperties() {
+        this.#builder = new QueryBuilder()
+    }
+}
+
+module.exports = fp(function (fastify, opts, done) {
+    fastify.decorate("q", QuerySingleton.get())
+
+    done()
+})

@@ -1,56 +1,49 @@
+const { UnauthenticatedError } = require("../errors")
+
 module.exports = function (fastify, opts, done) {
     fastify.post("/register", async function (request, reply) {
         let { email, password, username } = request.body
 
         const obj = await fastify.pg.transact(async (client) => {
-            const user = await client.query(
-                `SELECT * FROM users WHERE email = '${email}';`
-            )
-            if (user.rows.length > 0) return []
-
             password = await fastify.bcrypt.hash(password)
 
             const { rows } = await client.query(
-                `INSERT INTO users(user_uid, email, password, username, datetime) VALUES (uuid_generate_v4(), '${email}', '${password}', '${username}', now()) RETURNING *;`
+                fastify.q
+                    .model("users")
+                    .insert({ email, password, username })
+                    .returning()
+                    .eval()
             )
 
             return rows
         })
 
-        if (obj.length === 0) {
-            reply.code(409).send({ error: "email account already exists" })
-        } else {
-            reply.code(201).send({ data: obj })
-        }
+        reply.code(201).send({ data: obj })
     })
 
     fastify.post("/login", async function (request, reply) {
         let { email, password } = request.body
 
         const obj = await fastify.pg.transact(async (client) => {
-            const user = await client.query(
-                `SELECT * FROM users WHERE email = '${email}';`
+            const { rows } = await client.query(
+                fastify.q.model("users").find({ email }).eval()
             )
 
-            if (user.rows.length === 0) return []
+            if (rows.length === 0)
+                throw new UnauthenticatedError(`Invalid Login Credentials`)
 
             const match = await fastify.bcrypt.compare(
                 password,
-                user.rows[0].password
+                rows[0].password
             )
 
-            if (match) {
-                return user.rows
-            }
-            return []
-        })
+            if (!match)
+                throw new UnauthenticatedError(`Invalid Login Credentials`)
 
-        if (obj.length === 0) {
-            reply.code(401).send({ error: "Invalid Login Credentials" })
-        } else {
-            request.session.user = obj[0]
-            reply.code(200).send({ data: obj })
-        }
+            return rows[0]
+        })
+        request.session.user = obj
+        reply.code(200).send({ data: obj })
     })
 
     done()

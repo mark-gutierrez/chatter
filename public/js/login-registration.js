@@ -32,13 +32,13 @@ function Offline() {
 
     async function handleLogin(e) {
         e.preventDefault()
-        const { data, error } = await postData("/login", {
+        const { data, message } = await postData("/login", {
             email: `${email.toLowerCase()}`,
             password,
         })
 
-        if (error) {
-            setPopUpMessage(error)
+        if (message) {
+            setPopUpMessage(message)
             showPopupHandler()
         }
 
@@ -70,7 +70,8 @@ function Offline() {
         })
 
         if (error) {
-            setPopUpMessage(error)
+            setPopUpMessage("User email already registered")
+            setPage(!page)
             showPopupHandler()
         }
 

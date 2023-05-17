@@ -35,6 +35,10 @@ async function start() {
             options: { maxPayload: 1048576 },
         })
         fastify.register(require("./services/jwt"))
+        fastify.register(require("./services/request-handlers"))
+        fastify.register(require("./services/file-reader"))
+        fastify.register(require("./services/query-builder"))
+        fastify.register(require("./services/route-query"))
 
         // public routes
         fastify.register(require("@fastify/static"), {
@@ -58,13 +62,15 @@ async function start() {
             connectionString: fastify.config.DATABASE_URL,
         })
         fastify.register(require("./services/build-db"))
-
         fastify.ready((err) => {
             if (err) {
                 console.error(err)
             }
             fastify.swagger()
         })
+
+        fastify.setErrorHandler(require("./services/error-handler"))
+
         await fastify.listen({ port: fastify.config.PORT })
     } catch (err) {
         fastify.log.error(err)

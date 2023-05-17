@@ -12,23 +12,7 @@ const {
     deleteSchema,
 } = require("../schemas/routes")
 
-const Query = require("../services/route-query")
-
 module.exports = function (fastify, opts, done) {
-    async function callback(request, reply) {
-        const client = await fastify.pg.connect()
-        try {
-            const { rows } = await client.query(Query.get().build(request))
-            if (request.method === "GET") {
-                return reply.send({ data: rows })
-            } else {
-                reply.send({ ...(rows[0] ?? {}) })
-            }
-        } finally {
-            client.release()
-        }
-    }
-
     // Users route
     fastify.get(
         "/users",
@@ -36,7 +20,7 @@ module.exports = function (fastify, opts, done) {
             schema: getSchema(users, ["password"]),
             ...opts,
         },
-        callback
+        fastify.callback
     )
     fastify.patch(
         "/users/:id",
@@ -44,19 +28,19 @@ module.exports = function (fastify, opts, done) {
             schema: patchSchema(users, ["user_uid", "datetime", "password"]),
             ...opts,
         },
-        callback
+        fastify.callback
     )
     fastify.delete(
         "/users/:id",
         { schema: deleteSchema(users), ...opts },
-        callback
+        fastify.callback
     )
 
     // Conversations route
     fastify.get(
         "/conversations",
         { schema: getSchema(conversations), ...opts },
-        callback
+        fastify.callback
     )
     fastify.post(
         "/conversations",
@@ -68,12 +52,12 @@ module.exports = function (fastify, opts, done) {
             ),
             ...opts,
         },
-        callback
+        fastify.callback
     )
     fastify.delete(
         "/conversations/:id",
         { schema: deleteSchema(conversations), ...opts },
-        callback
+        fastify.callback
     )
 
     // User_Conversation route
@@ -83,7 +67,7 @@ module.exports = function (fastify, opts, done) {
             schema: getSchema(user_conversation),
             ...opts,
         },
-        callback
+        fastify.callback
     )
     fastify.post(
         "/user_conversation",
@@ -94,7 +78,7 @@ module.exports = function (fastify, opts, done) {
             ]),
             ...opts,
         },
-        callback
+        fastify.callback
     )
 
     // Messages route
@@ -104,7 +88,7 @@ module.exports = function (fastify, opts, done) {
             schema: getSchema(messages),
             ...opts,
         },
-        callback
+        fastify.callback
     )
     fastify.post(
         "/messages",
@@ -116,7 +100,7 @@ module.exports = function (fastify, opts, done) {
             ),
             ...opts,
         },
-        callback
+        fastify.callback
     )
     fastify.patch(
         "/messages/:id",
@@ -129,12 +113,12 @@ module.exports = function (fastify, opts, done) {
             ]),
             ...opts,
         },
-        callback
+        fastify.callback
     )
     fastify.delete(
         "/messages/:id",
         { schema: deleteSchema(messages), ...opts },
-        callback
+        fastify.callback
     )
 
     done()
