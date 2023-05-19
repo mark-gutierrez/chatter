@@ -1,17 +1,73 @@
-const fp = require("fastify-plugin")
-
 class QueryBuilder {
     #model
     #fields
     #entities
+    #joinTables
 
     constructor() {
         this.query = ""
         this.#model = ""
         this.#fields = ""
         this.#entities = entityBuild(require("../schemas/models"))
+        this.#joinTables = {}
     }
 
+    customModel({ query, name, model }) {
+        this.query = ""
+        if ((query === "", name === "", model === ""))
+            throw new Error("Empty query, name, model fields in customModel")
+
+        if (!this.#isValidModel(model))
+            throw new Error("Invalid model name in custom model")
+        this.#joinTables = {}
+        this.#joinTables[name] = this.#entities[model]
+        this.query = `SELECT * FROM (${query.slice(0, -1)}) AS ${name}`
+        return this
+    }
+
+    join({ model, name, on }) {
+        if (Object.keys(this.#joinTables).length === 0) {
+            this.#joinTables[this.#model] = this.#entities[this.#model]
+        }
+
+        if ((name === "", model === ""))
+            throw new Error("Empty name, model fields in join")
+
+        if (!this.#isValidModel(model))
+            throw new Error("Invalid model name in join")
+
+        if (!this.#isUniqueNameForJoinTable(name))
+            throw new Error("Name used in join is already used")
+
+        if (Object.keys(on) === 0 || on[Object.keys(on)[0]].length !== 2)
+            throw new Error("Invalid 'on' format in join")
+
+        this.#joinTables[name] = this.#entities[model]
+
+        if (!this.#isValidOnValues(on))
+            throw new Error("Invalid 'on' values for join")
+
+        this.query = `${
+            this.query
+        } JOIN ${model} AS ${name} ON ${this.#parseOnToString(on)}`
+        return this
+    }
+
+    customWhere(obj = {}) {
+        const { table, field, value } = obj
+        if (this.#joinTables[table][field] === undefined)
+            throw new Error(`Table ${table} or field ${field} invalid`)
+
+        this.query = `${this.query} WHERE ${table}.${field} ${
+            value.includes("$NOT$")
+                ? `!= '${value.replace("$NOT$", "")}'`
+                : `= '${value}'`
+        }`
+
+        return this
+    }
+
+    // methods for basic CRUD queries
     model(model) {
         this.query = ""
         const fields = this.#entities[model]
@@ -106,6 +162,7 @@ class QueryBuilder {
         return this
     }
 
+    // private utility methods
     #isObjectEmpty(obj = {}) {
         return Object.keys(obj).length === 0
     }
@@ -127,32 +184,42 @@ class QueryBuilder {
         return list.join(", ")
     }
 
-    #isValidFields(args, method) {
-        if (typeof args === "object" && !Array.isArray(args) && args !== null) {
-            if (!this.#isValidObjFields(args))
-                throw new Error(`Invalid field in object to ${method}`)
-        } else {
-            if (!this.#isValidListFields(args))
-                throw new Error(`Invalid field in list to ${method}`)
-        }
+    #isUniqueNameForJoinTable(name = "") {
+        return this.#joinTables[name] === undefined
     }
 
-    #isValidListFields(list = []) {
-        for (let i = 0; i < list.length; i++) {
-            if (!this.#hasFieldsInModel(list[i])) return false
+    #isValidOnValues(on = {}) {
+        const join = Object.keys(on)[0]
+        const tableList = on[join]
+        for (let i = 0; i < tableList.length; i++) {
+            const table = this.#joinTables[tableList[i]]
+            if (table === undefined || table[join] === undefined) return false
         }
         return true
     }
 
-    #isValidObjFields(obj = {}) {
-        for (const [key, value] of Object.entries(obj)) {
-            if (!this.#hasFieldsInModel(key)) return false
+    #parseOnToString(on = {}) {
+        const join = Object.keys(on)[0]
+        const [table1, table2] = on[join]
+        return `${table1}.${join} = ${table2}.${join}`
+    }
+
+    #isValidModel(model = "") {
+        return this.#entities[model] !== undefined
+    }
+
+    #isValidFields(args = [], method) {
+        if (!(args instanceof Array)) {
+            args = Object.keys(args)
         }
-        return true
+        for (let i = 0; i < args.length; i++) {
+            if (!this.#hasFieldsInModel(args[i]))
+                throw new Error(`Invalid field ${args[i]} in ${method}`)
+        }
     }
 
     #hasFieldsInModel(item = "") {
-        return Object.keys(this.#fields).includes(item)
+        return this.#fields[item] !== undefined
     }
 
     #filter(obj, delimiter = ", ") {
@@ -180,16 +247,20 @@ class QueryBuilder {
             }
             query = [...query, ...dateTimeQuery]
         }
-        console.log(query)
 
         return query.join(delimiter)
     }
 
+    // public methods used externally
     getEntities() {
-        return Object.keys(this.#entities)
+        return this.#entities
     }
 
+    // final method to run
     eval() {
+        this.#model = ""
+        this.#fields = ""
+        this.#joinTables = {}
         return this.query + ";"
     }
 }
@@ -219,8 +290,68 @@ class QuerySingleton {
     }
 }
 
-module.exports = fp(function (fastify, opts, done) {
-    fastify.decorate("q", QuerySingleton.get())
+if (typeof require !== "undefined" && require.main === module) {
+    const q = QuerySingleton.get()
+    const user_uid = "74e0c87d-62b5-4f78-a968-c84181086562"
+    const getConversationsForUser = q
+        .customModel({
+            query: q.model("user_conversation").find({ user_uid }).eval(),
+            name: "a",
+            model: "user_conversation",
+        })
+        .join({
+            model: "user_conversation",
+            name: "b",
+            on: { conversation_uid: ["a", "b"] },
+        })
+        .join({
+            model: "users",
+            name: "c",
+            on: { user_uid: ["b", "c"] },
+        })
+        .customWhere({
+            table: "a",
+            field: "user_uid",
+            value: `$NOT$${user_uid}`,
+        })
+        .eval()
 
-    done()
-})
+    const conversation_uid = "13b7304a-0d80-4b5c-8c49-ef117baf5a5e"
+    const populateMessages = q
+        .customModel({
+            query: q.model("messages").find({ conversation_uid }).eval(),
+            name: "a",
+            model: "messages",
+        })
+        .join({ model: "users", name: "b", on: { user_uid: ["a", "b"] } })
+        .eval()
+
+    const user_uid1 = "805a4fdf-17c5-4410-b8f0-09a0c9852c7e"
+    const user_uid2 = "74e0c87d-62b5-4f78-a968-c84181086562"
+    const checkIfConversationExists = q
+        .customModel({
+            query: q.model("users").find({ user_uid: user_uid1 }).eval(),
+            name: "a",
+            model: "user_conversation",
+        })
+        .join({
+            model: "user_conversation",
+            name: "b",
+            on: { conversation_uid: ["a", "b"] },
+        })
+        .customWhere({ table: "b", field: "user_uid", value: `${user_uid2}` })
+        .eval()
+
+    const createConversation = q
+        .model("conversations")
+        .insert()
+        .returning(["conversation_uid"])
+        .eval()
+
+    console.log(getConversationsForUser)
+    console.log(populateMessages)
+    console.log(checkIfConversationExists)
+    console.log(createConversation)
+}
+
+module.exports = QuerySingleton.get()

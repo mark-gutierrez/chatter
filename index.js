@@ -35,10 +35,10 @@ async function start() {
             options: { maxPayload: 1048576 },
         })
         fastify.register(require("./services/jwt"))
+
+        // custom plug-ins
+        fastify.register(require("./services/plugins"))
         fastify.register(require("./services/request-handlers"))
-        fastify.register(require("./services/file-reader"))
-        fastify.register(require("./services/query-builder"))
-        fastify.register(require("./services/route-query"))
 
         // public routes
         fastify.register(require("@fastify/static"), {

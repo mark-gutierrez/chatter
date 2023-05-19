@@ -13,12 +13,12 @@ const {
 } = require("../../schemas/routes")
 
 module.exports = function (fastify, opts, done) {
+    fastify.addHook("onRequest", fastify.authenticate)
     // Users route
     fastify.get(
         "/users",
         {
             schema: getSchema(users, ["password"]),
-            ...opts,
         },
         fastify.callback
     )
@@ -26,20 +26,19 @@ module.exports = function (fastify, opts, done) {
         "/users/:id",
         {
             schema: patchSchema(users, ["user_uid", "datetime", "password"]),
-            ...opts,
         },
         fastify.callback
     )
     fastify.delete(
         "/users/:id",
-        { schema: deleteSchema(users), ...opts },
+        { schema: deleteSchema(users) },
         fastify.callback
     )
 
     // Conversations route
     fastify.get(
         "/conversations",
-        { schema: getSchema(conversations), ...opts },
+        { schema: getSchema(conversations) },
         fastify.callback
     )
     fastify.post(
@@ -50,13 +49,12 @@ module.exports = function (fastify, opts, done) {
                 [],
                 ["conversation_uid", "datetime"]
             ),
-            ...opts,
         },
         fastify.callback
     )
     fastify.delete(
         "/conversations/:id",
-        { schema: deleteSchema(conversations), ...opts },
+        { schema: deleteSchema(conversations) },
         fastify.callback
     )
 
@@ -65,7 +63,6 @@ module.exports = function (fastify, opts, done) {
         "/user_conversation",
         {
             schema: getSchema(user_conversation),
-            ...opts,
         },
         fastify.callback
     )
@@ -76,7 +73,6 @@ module.exports = function (fastify, opts, done) {
                 "user_uid",
                 "conversation_uid",
             ]),
-            ...opts,
         },
         fastify.callback
     )
@@ -86,7 +82,6 @@ module.exports = function (fastify, opts, done) {
         "/messages",
         {
             schema: getSchema(messages),
-            ...opts,
         },
         fastify.callback
     )
@@ -98,7 +93,6 @@ module.exports = function (fastify, opts, done) {
                 ["user_uid", "conversation_uid", "text"],
                 ["message_uid", "datetime"]
             ),
-            ...opts,
         },
         fastify.callback
     )
@@ -111,13 +105,12 @@ module.exports = function (fastify, opts, done) {
                 "user_uid",
                 "message_uid",
             ]),
-            ...opts,
         },
         fastify.callback
     )
     fastify.delete(
         "/messages/:id",
-        { schema: deleteSchema(messages), ...opts },
+        { schema: deleteSchema(messages) },
         fastify.callback
     )
 
