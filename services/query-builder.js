@@ -12,12 +12,13 @@ class QueryBuilder {
         this.#joinTables = {}
     }
 
+    // subquery as a model
     customModel({ query, name, model }) {
         this.query = ""
-        if ((query === "", name === "", model === ""))
+        if (query === "" || name === "" || model === "")
             throw new Error("Empty query, name, model fields in customModel")
 
-        if (!this.#isValidModel(model))
+        if (!this.#hasKeyInObject(this.#entities, model))
             throw new Error("Invalid model name in custom model")
         this.#joinTables = {}
         this.#joinTables[name] = this.#entities[model]
@@ -25,6 +26,7 @@ class QueryBuilder {
         return this
     }
 
+    // join tables
     join({ model, name, on }) {
         if (Object.keys(this.#joinTables).length === 0) {
             this.#joinTables[this.#model] = this.#entities[this.#model]
@@ -33,10 +35,10 @@ class QueryBuilder {
         if ((name === "", model === ""))
             throw new Error("Empty name, model fields in join")
 
-        if (!this.#isValidModel(model))
+        if (!this.#hasKeyInObject(this.#entities, model))
             throw new Error("Invalid model name in join")
 
-        if (!this.#isUniqueNameForJoinTable(name))
+        if (this.#hasKeyInObject(this.#joinTables, name))
             throw new Error("Name used in join is already used")
 
         if (Object.keys(on) === 0 || on[Object.keys(on)[0]].length !== 2)
@@ -53,6 +55,7 @@ class QueryBuilder {
         return this
     }
 
+    // can filter with any part of the joined table
     customWhere(obj = {}) {
         const { table, field, value } = obj
         if (this.#joinTables[table][field] === undefined)
@@ -63,6 +66,28 @@ class QueryBuilder {
                 ? `!= '${value.replace("$NOT$", "")}'`
                 : `= '${value}'`
         }`
+
+        return this
+    }
+
+    // TODO: with has not model validation for inner 'as' query
+    with({ name, model, query }) {
+        if (query === "" || name === "" || model === "")
+            throw new Error("Empty query, name, model fields in with method")
+
+        if (this.query.trim().split(" ")[0] !== "with") {
+            this.query = ""
+        }
+
+        const queryModel = this.#extractModelFromQuery(query.trim())
+        if (model !== queryModel)
+            throw new Error("inner query model does not match model variable")
+
+        this.#joinTables[name] = this.#entities[model]
+
+        this.query = `${this.query} ${
+            this.query.trim().split(" ")[0] === "with" ? "," : "with"
+        } ${name} as ( ${query.slice(0, -1)} )`
 
         return this
     }
@@ -86,9 +111,28 @@ class QueryBuilder {
         return this
     }
 
+    // TODO: insert select has no validation for ref value
     insert(obj = {}) {
+        const init = `INSERT INTO ${obj?.model ?? this.#model}`
+
+        if (obj?.select !== undefined) {
+            const usedFields = this.#entities[obj?.model] ?? this.#fields
+
+            if (obj.select.length !== Object.keys(usedFields).length)
+                throw new Error(
+                    "select insert fields shape does not match model"
+                )
+
+            this.query = `${this.query} ${init} (${this.#listToString(
+                Object.keys(usedFields)
+            )}) SELECT ${this.#listToString(obj.select)} FROM ${
+                obj?.ref ?? this.#model
+            }`
+
+            return this
+        }
+
         this.#isValidFields(obj, "insert")
-        const init = `INSERT INTO ${this.#model}`
         this.query = this.#isObjectEmpty(obj)
             ? `${init} DEFAULT VALUES`
             : `${init} ${this.#genInsert(obj)}`
@@ -109,7 +153,15 @@ class QueryBuilder {
         return this
     }
 
+    // TODO: validate not exists field to query
     where(obj = {}) {
+        if (obj?.not_exists !== undefined) {
+            this.query = `${
+                this.query
+            } WHERE NOT EXISTS ( ${obj.not_exists.slice(0, -1)} )`
+            return this
+        }
+
         this.#isValidFields(obj, "where")
         const whereQuery = !this.#isObjectEmpty(obj)
             ? `WHERE ${this.#filter(obj, " AND ")}`
@@ -163,6 +215,17 @@ class QueryBuilder {
     }
 
     // private utility methods
+    #extractModelFromQuery(query = "") {
+        let queryList = query.split(" ")
+        if (queryList[0] === "SELECT")
+            return queryList[queryList.indexOf("FROM") + 1]
+
+        if (queryList[0] === "INSERT")
+            return queryList[queryList.indexOf("INTO") + 1]
+
+        throw new Error("model in query could not be found")
+    }
+
     #isObjectEmpty(obj = {}) {
         return Object.keys(obj).length === 0
     }
@@ -184,8 +247,8 @@ class QueryBuilder {
         return list.join(", ")
     }
 
-    #isUniqueNameForJoinTable(name = "") {
-        return this.#joinTables[name] === undefined
+    #hasKeyInObject(obj = {}, name = "") {
+        return obj[name] !== undefined
     }
 
     #isValidOnValues(on = {}) {
@@ -204,22 +267,14 @@ class QueryBuilder {
         return `${table1}.${join} = ${table2}.${join}`
     }
 
-    #isValidModel(model = "") {
-        return this.#entities[model] !== undefined
-    }
-
     #isValidFields(args = [], method) {
         if (!(args instanceof Array)) {
             args = Object.keys(args)
         }
         for (let i = 0; i < args.length; i++) {
-            if (!this.#hasFieldsInModel(args[i]))
+            if (!this.#hasKeyInObject(this.#fields, args[i]))
                 throw new Error(`Invalid field ${args[i]} in ${method}`)
         }
-    }
-
-    #hasFieldsInModel(item = "") {
-        return this.#fields[item] !== undefined
     }
 
     #filter(obj, delimiter = ", ") {
@@ -292,6 +347,8 @@ class QuerySingleton {
 
 if (typeof require !== "undefined" && require.main === module) {
     const q = QuerySingleton.get()
+
+    // retrieves all conversation from a specific user
     const user_uid = "74e0c87d-62b5-4f78-a968-c84181086562"
     const getConversationsForUser = q
         .customModel({
@@ -316,6 +373,7 @@ if (typeof require !== "undefined" && require.main === module) {
         })
         .eval()
 
+    // popluates messages in a conversation with user details
     const conversation_uid = "13b7304a-0d80-4b5c-8c49-ef117baf5a5e"
     const populateMessages = q
         .customModel({
@@ -326,11 +384,16 @@ if (typeof require !== "undefined" && require.main === module) {
         .join({ model: "users", name: "b", on: { user_uid: ["a", "b"] } })
         .eval()
 
+    // creates a conversation between two users
     const user_uid1 = "805a4fdf-17c5-4410-b8f0-09a0c9852c7e"
     const user_uid2 = "74e0c87d-62b5-4f78-a968-c84181086562"
+
     const checkIfConversationExists = q
         .customModel({
-            query: q.model("users").find({ user_uid: user_uid1 }).eval(),
+            query: q
+                .model("user_conversation")
+                .find({ user_uid: user_uid1 })
+                .eval(),
             name: "a",
             model: "user_conversation",
         })
@@ -342,15 +405,40 @@ if (typeof require !== "undefined" && require.main === module) {
         .customWhere({ table: "b", field: "user_uid", value: `${user_uid2}` })
         .eval()
 
-    const createConversation = q
+    const createConversationInstance = q
         .model("conversations")
         .insert()
-        .returning(["conversation_uid"])
+        .returning()
+        .eval()
+    const addUserOneToConversation = q
+        .model("user_conversation")
+        .insert({
+            select: [`'${user_uid1}'`, "conversation_uid"],
+            ref: "Create_Convo",
+        })
+        .returning()
         .eval()
 
-    console.log(getConversationsForUser)
-    console.log(populateMessages)
-    console.log(checkIfConversationExists)
+    const createConversation = q
+        .with({
+            name: "Create_Convo",
+            model: "conversations",
+            query: createConversationInstance,
+        })
+        .with({
+            name: "First_User",
+            model: "user_conversation",
+            query: addUserOneToConversation,
+        })
+        .insert({
+            model: "user_conversation",
+            select: [`'${user_uid2}'`, "conversation_uid"],
+            ref: "Create_Convo",
+        })
+        .where({ not_exists: checkIfConversationExists })
+        .returning()
+        .eval()
+
     console.log(createConversation)
 }
 
