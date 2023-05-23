@@ -19,11 +19,12 @@ module.exports = function (fastify, opts, done) {
                 password = await fastify.bcrypt.hash(password)
 
                 const { rows } = await client.query(
-                    fastify.q
-                        .model("users")
+                    fastify
+                        .q()
+                        .model({ model: "users" })
                         .insert({ email, password, username })
                         .returning()
-                        .eval()
+                        .eval(";")
                 )
 
                 return rows[0]
@@ -50,7 +51,12 @@ module.exports = function (fastify, opts, done) {
 
             const obj = await fastify.pg.transact(async (client) => {
                 const { rows } = await client.query(
-                    fastify.q.model("users").find({ email }).eval()
+                    fastify
+                        .q()
+                        .model({ model: "users" })
+                        .select()
+                        .where({ users: { email } })
+                        .eval(";")
                 )
 
                 if (rows.length === 0)

@@ -1,322 +1,524 @@
 class QueryBuilder {
-    #model
-    #fields
+    #meta
     #entities
-    #joinTables
+    #usedTables
 
     constructor() {
-        this.query = ""
-        this.#model = ""
-        this.#fields = ""
+        this.#meta = {}
+        this.#usedTables = {}
         this.#entities = entityBuild(require("../schemas/models"))
-        this.#joinTables = {}
     }
 
-    // subquery as a model
-    customModel({ query, name, model }) {
-        this.query = ""
-        if (query === "" || name === "" || model === "")
-            throw new Error("Empty query, name, model fields in customModel")
+    // methods
+    model({ model = "", as = "", custom = false }) {
+        const method = "model"
 
-        if (!this.#hasKeyInObject(this.#entities, model))
-            throw new Error("Invalid model name in custom model")
-        this.#joinTables = {}
-        this.#joinTables[name] = this.#entities[model]
-        this.query = `SELECT * FROM (${query.slice(0, -1)}) AS ${name}`
-        return this
-    }
-
-    // join tables
-    join({ model, name, on }) {
-        if (Object.keys(this.#joinTables).length === 0) {
-            this.#joinTables[this.#model] = this.#entities[this.#model]
+        if (custom) {
+            this.#meta[method] = model
+            this.#meta["custom"] = true
+            return this
         }
 
-        if ((name === "", model === ""))
-            throw new Error("Empty name, model fields in join")
-
-        if (!this.#hasKeyInObject(this.#entities, model))
-            throw new Error("Invalid model name in join")
-
-        if (this.#hasKeyInObject(this.#joinTables, name))
-            throw new Error("Name used in join is already used")
-
-        if (Object.keys(on) === 0 || on[Object.keys(on)[0]].length !== 2)
-            throw new Error("Invalid 'on' format in join")
-
-        this.#joinTables[name] = this.#entities[model]
-
-        if (!this.#isValidOnValues(on))
-            throw new Error("Invalid 'on' values for join")
-
-        this.query = `${
-            this.query
-        } JOIN ${model} AS ${name} ON ${this.#parseOnToString(on)}`
-        return this
-    }
-
-    // can filter with any part of the joined table
-    customWhere(obj = {}) {
-        const { table, field, value } = obj
-        if (this.#joinTables[table][field] === undefined)
-            throw new Error(`Table ${table} or field ${field} invalid`)
-
-        this.query = `${this.query} WHERE ${table}.${field} ${
-            value.includes("$NOT$")
-                ? `!= '${value.replace("$NOT$", "")}'`
-                : `= '${value}'`
-        }`
-
-        return this
-    }
-
-    // TODO: with has not model validation for inner 'as' query
-    with({ name, model, query }) {
-        if (query === "" || name === "" || model === "")
-            throw new Error("Empty query, name, model fields in with method")
-
-        if (this.query.trim().split(" ")[0] !== "with") {
-            this.query = ""
+        // if model input is another query (subquery)
+        if (model instanceof QueryBuilder) {
+            this.#checkValues(method, [model, as])
+            const meta = model.getMeta()
+            const table = model.getUsedTables()
+            this.#usedTables[as] = table[meta.model]
+            this.#meta[method] = model
+            this.#meta["as"] = as
+            return this
         }
 
-        const queryModel = this.#extractModelFromQuery(query.trim())
-        if (model !== queryModel)
-            throw new Error("inner query model does not match model variable")
+        // check if the model is one of the entities
+        if (model === "" || !this.#isKeyInObject(this.#entities, model))
+            throw new Error("model does not exist")
 
-        this.#joinTables[name] = this.#entities[model]
-
-        this.query = `${this.query} ${
-            this.query.trim().split(" ")[0] === "with" ? "," : "with"
-        } ${name} as ( ${query.slice(0, -1)} )`
-
-        return this
-    }
-
-    // methods for basic CRUD queries
-    model(model) {
-        this.query = ""
-        const fields = this.#entities[model]
-        if (!fields) throw new Error("Model does not exist")
-        this.#model = model
-        this.#fields = fields
-        return this
-    }
-
-    find(obj = {}) {
-        this.#isValidFields(obj, "find")
-        this.query = `SELECT * FROM ${this.#model}`
-        if (!this.#isObjectEmpty(obj)) {
-            this.where(obj)
+        // setting model alias
+        this.#meta[method] = model
+        if (as !== "") {
+            this.#meta["as"] = as
         }
+        this.#usedTables[as !== "" ? as : model] = this.#entities[model]
+
         return this
     }
 
-    // TODO: insert select has no validation for ref value
-    insert(obj = {}) {
-        const init = `INSERT INTO ${obj?.model ?? this.#model}`
+    // TODO: build to work on joined tables
+    select(fields = []) {
+        const method = "select"
 
-        if (obj?.select !== undefined) {
-            const usedFields = this.#entities[obj?.model] ?? this.#fields
+        if (this.#meta["custom"]) {
+            this.#meta[method] = fields
+            return this
+        }
 
-            if (obj.select.length !== Object.keys(usedFields).length)
+        this.#hasEnvoked({ fields: ["model"], method })
+
+        // check if the select list are valid in the used tables
+        this.#fieldsInModel({ fields, method: "select" })
+        if (fields.length > 0) this.#adjustUsedTables({ fields })
+
+        this.#meta[method] = fields
+        return this
+    }
+
+    where(obj = {}) {
+        const method = "where"
+
+        this.#hasEnvoked({ fields: ["model"], method })
+        const [f, v] = this.#getObjectFieldsAndValues(obj)
+        this.#checkFields({ method, fields: f })
+        this.#checkValues({ method, values: v })
+
+        if (obj?.not_exists instanceof QueryBuilder) {
+            this.#meta[method] = { not_exists: obj.not_exists.eval() }
+            return this
+        }
+
+        for (const [key, value] of Object.entries(obj)) {
+            const [fields, values] = this.#getObjectFieldsAndValues(value)
+            this.#checkFields({ method, fields })
+            this.#checkValues({ method, values })
+            this.#fieldsInModel({ model: key, fields, method })
+        }
+        this.#meta[method] = obj
+        return this
+    }
+
+    join({ model = "", as = "", field = "", joinTable = "" }) {
+        const method = "join"
+        const error = `Method: ${method} | Error:`
+
+        this.#hasEnvoked({ fields: ["model", "select"], method })
+
+        this.#checkFields({ method, fields: [model, as, field, joinTable] })
+
+        if (!this.#isKeyInObject(this.#entities, model))
+            throw new Error(
+                `${error} reference model '${model}' does not exists `
+            )
+        if (!this.#isKeyInObject(this.#usedTables, joinTable))
+            throw new Error(
+                `${error} joinTable '${joinTable}' does not exists in the context of the query`
+            )
+        if (this.#isKeyInObject(this.#usedTables, as))
+            throw new Error(`${error} as key '${as}' must be unique`)
+        if (
+            !this.#isKeyInObject(this.#entities[model], field) ||
+            !this.#isKeyInObject(this.#usedTables[joinTable], field)
+        )
+            throw new Error(
+                `${error} field value ${field} is not shared in both ${model} and ${joinTable} tables`
+            )
+
+        this.#meta[method] = this.#meta[method] || []
+        this.#meta[method].push({ model, as, field, joinTable })
+        this.#usedTables[as] = this.#entities[model]
+
+        return this
+    }
+
+    with({ statments = [], final = "" }) {
+        const method = "withQuery"
+        if (!(final instanceof QueryBuilder))
+            throw new Error(
+                `Method: ${method} | Error: final statment is not a valid query`
+            )
+        if (statments.length === 0)
+            throw new Error(
+                `Method: ${method} | Error: statments list must have at least 1 query`
+            )
+
+        this.#meta[method] = this.#meta[method] || {}
+
+        for (let i = 0; i < statments.length; i++) {
+            const { table, query } = statments[i]
+
+            if (table === undefined || query == undefined)
                 throw new Error(
-                    "select insert fields shape does not match model"
+                    `Method: ${method} | Error: each statement entry must have table and query fields`
                 )
 
-            this.query = `${this.query} ${init} (${this.#listToString(
-                Object.keys(usedFields)
-            )}) SELECT ${this.#listToString(obj.select)} FROM ${
-                obj?.ref ?? this.#model
-            }`
+            const [fields, values] = this.#getObjectFieldsAndValues(
+                statments[i]
+            )
+            this.#checkFields({ fields, method })
+            this.#checkValues({ values, method })
 
-            return this
+            if (!(query instanceof QueryBuilder))
+                throw new Error(
+                    `Method: ${method} | Error: query in statments must be an Query instance`
+                )
+
+            const { model } = query.getMeta()
+            const tables = query.getUsedTables()[model]
+
+            this.#usedTables[table] = tables
+            this.#meta[method][table] = query.eval()
         }
 
-        this.#isValidFields(obj, "insert")
-        this.query = this.#isObjectEmpty(obj)
-            ? `${init} DEFAULT VALUES`
-            : `${init} ${this.#genInsert(obj)}`
+        this.#meta["withCallBack"] = final.eval()
+
         return this
     }
 
-    update(obj = {}) {
-        this.#isValidFields(obj, "update")
-        if (this.#isObjectEmpty(obj)) throw new Error("Empty object to update")
-        this.query = `UPDATE ${this.#model} SET ${this.#filter(obj)}`
-        return this
-    }
+    sort(fields = []) {
+        const method = "sort"
 
-    delete(obj = {}) {
-        this.#isValidFields(obj, "delete")
-        this.query = `DELETE FROM ${this.#model}`
-        this.where(obj)
-        return this
-    }
+        this.#hasEnvoked({ fields: ["model", "select"], method })
+        this.#checkFields({ method, fields })
 
-    // TODO: validate not exists field to query
-    where(obj = {}) {
-        if (obj?.not_exists !== undefined) {
-            this.query = `${
-                this.query
-            } WHERE NOT EXISTS ( ${obj.not_exists.slice(0, -1)} )`
-            return this
-        }
+        // check if the sort list are valid in the used tables
+        this.#fieldsInModel({
+            fields: fields.map((e) => e.replace("-", "")),
+            method,
+        })
 
-        this.#isValidFields(obj, "where")
-        const whereQuery = !this.#isObjectEmpty(obj)
-            ? `WHERE ${this.#filter(obj, " AND ")}`
-            : ""
-        this.query = `${this.query} ${whereQuery}`
-        return this
-    }
-
-    select(list = []) {
-        if (list.length === 0) return this
-        this.#isValidFields(list, "select")
-        this.query = this.query.replace(" * ", ` ${this.#listToString(list)} `)
-        return this
-    }
-
-    returning(list = []) {
-        this.#isValidFields(list, "returning")
-        let init = `${this.query} RETURNING`
-        this.query =
-            list.length === 0
-                ? `${init} *`
-                : `${init} ${this.#listToString(list)}`
-        return this
-    }
-
-    sort(list = []) {
-        this.#isValidFields(
-            list.map((e) => e.replace("-", "")),
-            "sort"
-        )
-        this.query = `${this.query} ${
-            list.length > 0
-                ? `ORDER BY${list.map((e) =>
-                      Array.from(e)[0] === "-"
-                          ? ` ${e.substring(1)} DESC`
-                          : ` ${e} ASC`
-                  )}`
-                : ""
-        }`
+        this.#meta[method] = fields
         return this
     }
 
     limit(limit = 10) {
-        this.query = `${this.query} LIMIT ${limit}`
+        const method = "limit"
+        this.#hasEnvoked({ fields: ["model", "select"], method })
+        this.#meta[method] = limit
         return this
     }
 
-    offset(skip = 0) {
-        this.query = `${this.query} OFFSET ${skip}`
+    offset(offset = 0) {
+        const method = "offset"
+        this.#hasEnvoked({ fields: ["model", "select"], method })
+        this.#meta[method] = offset
         return this
     }
 
-    // private utility methods
-    #extractModelFromQuery(query = "") {
-        let queryList = query.split(" ")
-        if (queryList[0] === "SELECT")
-            return queryList[queryList.indexOf("FROM") + 1]
+    insert(obj = {}) {
+        const method = "insert"
+        this.#hasEnvoked({ fields: ["model"], method })
 
-        if (queryList[0] === "INSERT")
-            return queryList[queryList.indexOf("INTO") + 1]
-
-        throw new Error("model in query could not be found")
-    }
-
-    #isObjectEmpty(obj = {}) {
-        return Object.keys(obj).length === 0
-    }
-
-    #genInsert(obj = {}) {
-        let fields = []
-        let values = []
-        for (const [key, value] of Object.entries(obj)) {
-            fields.push(key)
-            values.push(`'${value}'`)
+        if (obj?.subquery instanceof QueryBuilder) {
+            const { select } = obj.subquery.getMeta()
+            if (
+                Object.keys(this.#usedTables[this.#meta["model"]]).length !==
+                select.length
+            )
+                throw new Error(
+                    `Method: ${method} | Error: Subquery shape does not match input model`
+                )
+            this.#meta[method] = { subquery: obj.subquery.eval() }
+            return this
         }
 
-        return `(${this.#listToString(fields)}) VALUES (${this.#listToString(
-            values
-        )})`
+        const [fields, values] = this.#getObjectFieldsAndValues(obj)
+        this.#checkValues({ method, values })
+        this.#fieldsInModel({ fields, method })
+        this.#meta[method] = obj
+        return this
     }
 
-    #listToString(list = []) {
-        return list.join(", ")
+    returning(fields = []) {
+        const method = "returning"
+        this.#hasEnvoked({ fields: ["model"], method })
+        this.#fieldsInModel({ fields, method })
+        if (fields.length > 0) this.#adjustUsedTables({ fields })
+        this.#meta[method] = fields
+        return this
     }
 
-    #hasKeyInObject(obj = {}, name = "") {
+    update(obj = {}) {
+        const method = "update"
+        this.#hasEnvoked({ fields: ["model"], method })
+        const [fields, values] = this.#getObjectFieldsAndValues(obj)
+        this.#checkFields({ method, fields })
+        this.#checkValues({ method, values })
+        this.#fieldsInModel({ fields, method })
+        this.#meta[method] = obj
+        return this
+    }
+
+    delete(obj = {}) {
+        const method = "remove"
+        this.#hasEnvoked({ fields: ["model"], method })
+        const [fields, values] = this.#getObjectFieldsAndValues(obj)
+        this.#checkFields({ method, fields })
+        this.#checkValues({ method, values })
+        this.#fieldsInModel({ fields, method })
+        this.#meta[method] = {}
+        const temp = {}
+        temp[this.#meta["model"]] = obj
+        this.#meta["where"] = temp
+        return this
+    }
+
+    // util methods
+    #hasEnvoked({ fields = [], method = "" }) {
+        for (let i = 0; i < fields.length; i++) {
+            if (!this.#isKeyInObject(this.#meta, fields[i]))
+                throw new Error(
+                    `Method: '${fields[i]}' must be envoked before using '${method}'`
+                )
+        }
+    }
+
+    #checkFields({ method = "", fields = [] }) {
+        // checks if all object is not empty
+        if (fields.length === 0)
+            throw new Error(
+                `'${method}' method cannot be envoked with empty fields`
+            )
+    }
+
+    #checkValues({ method = "", values = [] }) {
+        // check if all values are not null
+        if (values.length > 0 && values.includes(""))
+            throw new Error(`All values in ${method} object must not be empty`)
+    }
+
+    #isKeyInObject(obj = {}, name = "") {
         return obj[name] !== undefined
     }
 
-    #isValidOnValues(on = {}) {
-        const join = Object.keys(on)[0]
-        const tableList = on[join]
-        for (let i = 0; i < tableList.length; i++) {
-            const table = this.#joinTables[tableList[i]]
-            if (table === undefined || table[join] === undefined) return false
-        }
-        return true
+    #listToString(list = [], joiner = ", ") {
+        return list.join(joiner)
     }
 
-    #parseOnToString(on = {}) {
-        const join = Object.keys(on)[0]
-        const [table1, table2] = on[join]
-        return `${table1}.${join} = ${table2}.${join}`
+    #getObjectFieldsAndValues(obj = {}) {
+        return [Object.keys(obj), Object.values(obj)]
     }
 
-    #isValidFields(args = [], method) {
-        if (!(args instanceof Array)) {
-            args = Object.keys(args)
-        }
-        for (let i = 0; i < args.length; i++) {
-            if (!this.#hasKeyInObject(this.#fields, args[i]))
-                throw new Error(`Invalid field ${args[i]} in ${method}`)
-        }
-    }
-
-    #filter(obj, delimiter = ", ") {
-        let { datetime, ...rest } = obj
-
-        let query = []
-        for (const [key, value] of Object.entries(rest)) {
-            query.push(`${key} = '${value}'`)
-        }
-
-        if (datetime) {
-            let dateTimeQuery = []
-            const dateTimeFilters = {
-                gt: ">",
-                gte: ">=",
-                lt: "<",
-                lte: "<=",
-            }
-            datetime = JSON.parse(datetime)
-
-            for (const [key, value] of Object.entries(datetime)) {
-                dateTimeQuery.push(
-                    `datetime ${dateTimeFilters[key]} '${value}'`
+    #fieldsInModel({ model = this.#meta["model"], fields = [], method }) {
+        // check if the object fields are valid in the used tables
+        for (let i = 0; i < fields.length; i++) {
+            if (
+                !(
+                    (
+                        this.#isKeyInObject(
+                            this.#usedTables[model],
+                            fields[i]
+                        ) ||
+                        this.#isKeyInObject(this.#entities[model], fields[i])
+                    ) // might be problematic
                 )
-            }
-            query = [...query, ...dateTimeQuery]
+            )
+                throw new Error(
+                    `Method: '${method}' | Field: '${fields[i]}' does not exist in Model: '${model}'`
+                )
         }
-
-        return query.join(delimiter)
     }
 
-    // public methods used externally
+    #adjustUsedTables({ model = this.#meta["model"], fields = [] }) {
+        const table = JSON.parse(JSON.stringify(this.#usedTables[model]))
+
+        for (const [key, value] of Object.entries(table)) {
+            if (!fields.includes(key)) delete table[key]
+        }
+
+        this.#usedTables[model] = table
+    }
+
+    #whereResolver(obj = {}, table = "") {
+        let queryList = []
+        for (const [key, value] of Object.entries(obj)) {
+            queryList.push(
+                `${table}.${key} ${
+                    value.includes("$NOT$")
+                        ? `!= '${value.replace("$NOT$", "")}'`
+                        : `= '${value}'`
+                }`
+            )
+        }
+        return queryList
+    }
+
+    #datetimeResolver(datetime = "{}", table = "") {
+        let dateTimeQuery = []
+        const dateTimeFilters = {
+            gt: ">",
+            gte: ">=",
+            lt: "<",
+            lte: "<=",
+        }
+        datetime = JSON.parse(datetime)
+        for (const [key, value] of Object.entries(datetime)) {
+            dateTimeQuery.push(
+                `${table}.datetime ${dateTimeFilters[key]} '${value}'`
+            )
+        }
+
+        return dateTimeQuery
+    }
+
+    #appendStrings(...theArgs) {
+        let string = ""
+        for (const arg of theArgs) {
+            string += `${arg} `
+        }
+        return string
+    }
+
+    // external methods
     getEntities() {
         return this.#entities
     }
+    getMeta() {
+        return this.#meta
+    }
+    getUsedTables() {
+        return this.#usedTables
+    }
 
-    // final method to run
-    eval() {
-        this.#model = ""
-        this.#fields = ""
-        this.#joinTables = {}
-        return this.query + ";"
+    // meta data to string
+    eval(end = "") {
+        const {
+            model,
+            select,
+            insert,
+            update,
+            remove,
+            where,
+            sort,
+            limit,
+            offset,
+            returning,
+            as,
+            join,
+            withQuery,
+            withCallBack,
+        } = this.#meta
+
+        let query = ""
+
+        if (select) {
+            query = this.#appendStrings(
+                query,
+                "SELECT",
+                select.length > 0 ? this.#listToString(select) : "*"
+            )
+        }
+        if (insert) {
+            if (insert?.subquery) {
+                query = this.#appendStrings(
+                    query,
+                    "INSERT INTO",
+                    model,
+                    insert.subquery
+                )
+            } else {
+                const [fields, values] = this.#getObjectFieldsAndValues(insert)
+                query = this.#appendStrings(
+                    query,
+                    "INSERT INTO",
+                    model,
+                    `${
+                        fields.length === 0
+                            ? "DEFAULT VALUES"
+                            : `(${this.#listToString(
+                                  fields
+                              )}) VALUES (${this.#listToString(
+                                  values.map((e) => `'${e}'`)
+                              )})`
+                    }`
+                )
+            }
+        }
+        if (model && update) {
+            const [fields, values] = this.#getObjectFieldsAndValues(update)
+            query = this.#appendStrings(
+                query,
+                "UPDATE",
+                model,
+                "SET",
+                `(${this.#listToString(fields)}) = (${this.#listToString(
+                    values.map((e) => `'${e}'`)
+                )})`
+            )
+        }
+        if (model && remove) {
+            query = this.#appendStrings(query, "DELETE FROM", model)
+        }
+        if (model && select) {
+            query = this.#appendStrings(
+                query,
+                "FROM",
+                `${
+                    model instanceof QueryBuilder ? `(${model.eval()})` : model
+                }`,
+                `${as ? `as ${as}` : ""}`
+            )
+        }
+
+        if (join) {
+            for (let i = 0; i < join.length; i++) {
+                const obj = join[i]
+                query = this.#appendStrings(
+                    query,
+                    "JOIN",
+                    `${obj.model} as ${obj.as} ON ${obj.joinTable}.${obj.field} = ${obj.as}.${obj.field}`
+                )
+            }
+        }
+        if (where) {
+            if (where?.not_exists) {
+                query = this.#appendStrings(
+                    query,
+                    "WHERE NOT EXISTS",
+                    `(${where.not_exists})`
+                )
+            } else {
+                let list = []
+                for (const [key, value] of Object.entries(where)) {
+                    let { datetime, ...rest } = value
+                    let queryList = this.#whereResolver(rest, key)
+                    datetime = this.#datetimeResolver(datetime, key)
+                    list = [...list, ...queryList, ...datetime]
+                }
+                query = this.#appendStrings(
+                    query,
+                    "WHERE",
+                    this.#listToString(list, " AND ")
+                )
+            }
+        }
+        if (sort) {
+            query = this.#appendStrings(
+                query,
+                "ORDER BY",
+                sort.map((e) =>
+                    Array.from(e)[0] === "-"
+                        ? ` ${e.substring(1)} DESC`
+                        : ` ${e} ASC`
+                )
+            )
+        }
+        if (limit) {
+            query = this.#appendStrings(query, "LIMIT", limit)
+        }
+        if (offset) {
+            query = this.#appendStrings(query, "OFFSET", offset)
+        }
+        if (returning) {
+            query = this.#appendStrings(
+                query,
+                "RETURNING",
+                returning.length > 0 ? this.#listToString(returning) : "*"
+            )
+        }
+
+        if (withQuery && withCallBack) {
+            let statements = []
+            for (const [key, value] of Object.entries(withQuery)) {
+                statements.push(`${key} as (${value})`)
+            }
+
+            query = this.#appendStrings(
+                "with",
+                this.#listToString(statements),
+                withCallBack
+            )
+        }
+
+        return (query + end).trim()
     }
 }
 
@@ -328,118 +530,113 @@ function entityBuild(model = {}) {
     return obj
 }
 
-class QuerySingleton {
-    static #instance
-    #builder
-
-    static get() {
-        if (!QuerySingleton.#instance) {
-            QuerySingleton.#instance = new QuerySingleton()
-            QuerySingleton.#instance.initializeProperties()
-        }
-        return QuerySingleton.#instance.#builder
-    }
-
-    initializeProperties() {
-        this.#builder = new QueryBuilder()
-    }
+function QueryFactory() {
+    return new QueryBuilder()
 }
 
-if (typeof require !== "undefined" && require.main === module) {
-    const q = QuerySingleton.get()
+module.exports = QueryFactory
 
-    // retrieves all conversation from a specific user
+if (typeof require !== "undefined" && require.main === module) {
     const user_uid = "74e0c87d-62b5-4f78-a968-c84181086562"
-    const getConversationsForUser = q
-        .customModel({
-            query: q.model("user_conversation").find({ user_uid }).eval(),
-            name: "a",
-            model: "user_conversation",
+    const user_uid1 = "23a9295c-3d16-4cf1-9bfd-c4f484c6c9e6"
+    const user_uid2 = "1e41df4c-02ee-4473-b504-465f6a971f2b"
+    const conversation_uid = "13b7304a-0d80-4b5c-8cz49-ef117baf5a5e"
+
+    const findUser1Convo = QueryFactory()
+        .model({ model: "user_conversation" })
+        .select()
+        .where({ user_conversation: { user_uid } })
+
+    const getConversationsForUser = QueryFactory()
+        .model({
+            model: findUser1Convo,
+            as: "a",
         })
+        .select()
         .join({
             model: "user_conversation",
-            name: "b",
-            on: { conversation_uid: ["a", "b"] },
+            as: "b",
+            field: "conversation_uid",
+            joinTable: "a",
         })
         .join({
             model: "users",
-            name: "c",
-            on: { user_uid: ["b", "c"] },
-        })
-        .customWhere({
-            table: "a",
+            as: "c",
             field: "user_uid",
-            value: `$NOT$${user_uid}`,
+            joinTable: "b",
         })
-        .eval()
-
-    // popluates messages in a conversation with user details
-    const conversation_uid = "13b7304a-0d80-4b5c-8c49-ef117baf5a5e"
-    const populateMessages = q
-        .customModel({
-            query: q.model("messages").find({ conversation_uid }).eval(),
-            name: "a",
-            model: "messages",
+        .where({
+            b: { user_uid: `$NOT$${user_uid}` },
         })
-        .join({ model: "users", name: "b", on: { user_uid: ["a", "b"] } })
-        .eval()
 
-    // creates a conversation between two users
-    const user_uid1 = "805a4fdf-17c5-4410-b8f0-09a0c9852c7e"
-    const user_uid2 = "74e0c87d-62b5-4f78-a968-c84181086562"
+    const findMessages = QueryFactory()
+        .model({ model: "messages" })
+        .select()
+        .where({ messages: { conversation_uid } })
+        .sort(["datetime"])
 
-    const checkIfConversationExists = q
-        .customModel({
-            query: q
-                .model("user_conversation")
-                .find({ user_uid: user_uid1 })
-                .eval(),
-            name: "a",
-            model: "user_conversation",
+    const populateMessages = QueryFactory()
+        .model({ model: findMessages, as: "a" })
+        .select()
+        .join({ model: "users", as: "b", field: "user_uid", joinTable: "a" })
+
+    const findUserConversations = QueryFactory()
+        .model({ model: "user_conversation" })
+        .select()
+        .where({ user_conversation: { user_uid: user_uid1 } })
+
+    const checkIfConversationExists = QueryFactory()
+        .model({
+            model: findUserConversations,
+            as: "a",
         })
+        .select()
         .join({
             model: "user_conversation",
-            name: "b",
-            on: { conversation_uid: ["a", "b"] },
+            as: "b",
+            field: "conversation_uid",
+            joinTable: "a",
         })
-        .customWhere({ table: "b", field: "user_uid", value: `${user_uid2}` })
-        .eval()
+        .where({ b: { user_uid: user_uid2 } })
 
-    const createConversationInstance = q
-        .model("conversations")
+    const createConversationInstance = QueryFactory()
+        .model({
+            model: "conversations",
+        })
         .insert()
         .returning()
-        .eval()
-    const addUserOneToConversation = q
-        .model("user_conversation")
-        .insert({
-            select: [`'${user_uid1}'`, "conversation_uid"],
-            ref: "Create_Convo",
-        })
-        .returning()
-        .eval()
 
-    const createConversation = q
-        .with({
-            name: "Create_Convo",
-            model: "conversations",
-            query: createConversationInstance,
-        })
-        .with({
-            name: "First_User",
+    const selectQuery1 = QueryFactory()
+        .model({ model: "Create_Convo", custom: true })
+        .select([`'${user_uid1}'`, "conversation_uid"])
+    const selectQuery2 = QueryFactory()
+        .model({ model: "Create_Convo", custom: true })
+        .select([`'${user_uid2}'`, "conversation_uid"])
+    const addUserOneToConversation = QueryFactory()
+        .model({
             model: "user_conversation",
-            query: addUserOneToConversation,
         })
-        .insert({
+        .insert({ subquery: selectQuery1 })
+        .returning()
+    const addUserTwoToConversation = QueryFactory()
+        .model({
             model: "user_conversation",
-            select: [`'${user_uid2}'`, "conversation_uid"],
-            ref: "Create_Convo",
         })
+        .insert({ subquery: selectQuery2 })
         .where({ not_exists: checkIfConversationExists })
         .returning()
-        .eval()
 
-    console.log(createConversation)
+    const createConversation = QueryFactory().with({
+        statments: [
+            {
+                table: "Create_Convo",
+                query: createConversationInstance,
+            },
+            {
+                table: "First_User",
+                query: addUserOneToConversation,
+            },
+        ],
+        final: addUserTwoToConversation,
+    })
 }
-
-module.exports = QuerySingleton.get()

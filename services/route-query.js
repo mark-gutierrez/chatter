@@ -1,4 +1,4 @@
-const Builder = require("./query-builder")
+const QueryFactory = require("./query-builder")
 
 class RequestToQuerySingleton {
     static #instance
@@ -14,7 +14,7 @@ class RequestToQuerySingleton {
     }
 
     initializeProperties() {
-        this.#builder = Builder
+        this.#builder = QueryFactory
         this.#query = ""
     }
 
@@ -25,38 +25,47 @@ class RequestToQuerySingleton {
         if (method === "POST") this.#post(entity, body)
         if (method === "PATCH") this.#patch(entity, id, body)
         if (method === "DELETE") this.#delete(entity, id)
-        return this.#query.eval()
+        return this.#query.eval(";")
     }
 
     #get(entity, { select, sort, page, limit, ...query }) {
-        this.#query = this.#builder.model(entity).find(query)
+        console.log(this.#stringToList(select))
+        this.#query = this.#builder()
+            .model({ model: entity })
+            .select(this.#stringToList(select))
 
-        if (select) {
-            this.#query = this.#query.select(this.#stringToList(select))
+        if (Object.keys(query).length > 0) {
+            const obj = {}
+            obj[entity] = query
+            this.#query = this.#query.where(obj)
         }
 
-        if (sort) {
-            this.#query = this.#query.sort(this.#stringToList(sort))
-        }
+        if (sort) this.#query = this.#query.sort(this.#stringToList(sort))
 
         this.#paginate(page, limit)
     }
 
     #post(entity, body) {
-        this.#query = this.#builder.model(entity).insert(body).returning()
+        this.#query = this.#builder()
+            .model({ model: entity })
+            .insert(body)
+            .returning()
     }
 
     #patch(entity, id, body) {
-        this.#query = this.#builder
-            .model(entity)
+        const obj = {}
+        obj[entity] = this.#getId(entity, id)
+
+        this.#query = this.#builder()
+            .model({ model: entity })
             .update(body)
-            .where(this.#getId(entity, id))
+            .where(obj)
             .returning()
     }
 
     #delete(entity, id) {
-        this.#query = this.#builder
-            .model(entity)
+        this.#query = this.#builder()
+            .model({ model: entity })
             .delete(this.#getId(entity, id))
             .returning()
     }
@@ -70,7 +79,7 @@ class RequestToQuerySingleton {
     #urlParse(url) {
         let list = this.#stringToList(url, "/")
         return list.filter(
-            (element) => this.#builder.getEntities()[element] !== undefined
+            (element) => this.#builder().getEntities()[element] !== undefined
         )[0]
     }
 
@@ -82,7 +91,7 @@ class RequestToQuerySingleton {
     }
 
     #stringToList(list, delimiter = ",") {
-        return list.split(delimiter)
+        return list?.split(delimiter) ?? []
     }
 
     #singularize(entity) {
