@@ -2,7 +2,7 @@
 // NOTE: 'where' subqueries default to WHERE NOT EXISTS
 // NOTE: 'with' method not safe.
 
-class Query {
+class QueryBuilder {
     #entities
     constructor(schema, tables) {
         this.schema = schema ?? {}
@@ -11,19 +11,19 @@ class Query {
     }
 
     // used methods
-    model({ model = "", as = "" }) {
+    model({ model = "", as }) {
         const method = "model"
 
         // model subqueries
-        if (model instanceof Query) {
-            if (!(model.schema?.model && model.schema?.select))
-                throw new Error(
-                    `Subquery instance invalid, needs 'model' and 'select' fields`
-                )
-            if (as === "")
-                throw new Error(
-                    `'as' field required when using subquery as model`
-                )
+        if (model instanceof QueryBuilder) {
+            this.#error(
+                !(model.schema?.model && model.schema?.select),
+                `Subquery instance invalid, needs 'model' and 'select' fields`
+            )
+            this.#error(
+                as === "" || !as,
+                `'as' field required when using subquery as model`
+            )
 
             const { schema, tables } = model
             this.schema[method] = schema
@@ -40,13 +40,20 @@ class Query {
         }
 
         // check if the model is one of the entities
-        if (model === "" || !this.#keyInObject(model, this.#entities))
-            throw new Error(`${method}: ${model} is not an available entity`)
+        this.#error(
+            model === "" || !this.#keyInObject(model, this.#entities),
+            `${method}: ${model} is not an available entity`
+        )
+
+        this.#error(
+            as !== undefined && as === "",
+            `${method}: 'as' field cannot be empty`
+        )
 
         // set schema values
         this.schema[method] = model
-        this.schema["as"] = as !== "" ? as : undefined
-        this.tables[as !== "" ? as : model] = this.#entities[model]
+        this.schema["as"] = as !== undefined ? as : undefined
+        this.tables[as !== undefined ? as : model] = this.#entities[model]
         return this
     }
 
@@ -56,6 +63,7 @@ class Query {
 
         // check dependencies
         this.#dependencies({ methods: ["model"], method })
+        this.#uniqueMethod({ methods: ["update", "delete", "insert"], method })
 
         // check if object is empty
         if (Object.keys(obj).length === 0) {
@@ -90,25 +98,25 @@ class Query {
         this.#checkFields({ method, fields: [model, as, field, joinTable] })
 
         // validation checks
-        if (!this.#keyInObject(model, this.#entities))
-            throw new Error(
-                `${method}: reference model '${model}' does not exists `
-            )
-        if (!this.#keyInObject(joinTable, this.tables))
-            throw new Error(
-                `${method}: joinTable '${joinTable}' does not exists in the context of the query`
-            )
-        if (this.#keyInObject(as, this.tables))
-            throw new Error(`${method}: as key '${as}' must be unique`)
-        if (
+        this.#error(
+            !this.#keyInObject(model, this.#entities),
+            `${method}: reference model '${model}' does not exists `
+        )
+        this.#error(
+            !this.#keyInObject(joinTable, this.tables),
+            `${method}: joinTable '${joinTable}' does not exists in the context of the query`
+        )
+        this.#error(
+            this.#keyInObject(as, this.tables),
+            `${method}: as key '${as}' must be unique`
+        )
+        this.#error(
             !(
                 this.#keyInObject(field, this.#entities[model]) &&
                 this.#keyInObject(field, this.tables[joinTable])
-            )
+            ),
+            `${method}: field value ${field} is not shared in both ${model} and ${joinTable} tables`
         )
-            throw new Error(
-                `${method}: field value ${field} is not shared in both ${model} and ${joinTable} tables`
-            )
 
         // save to schema and tables
         this.schema[method] = this.schema[method] || []
@@ -122,12 +130,17 @@ class Query {
         // obj = { tableName: { key: 'value' } }
         const method = "where"
 
-        this.#dependencies({ methods: ["model", "select"], method })
+        this.#dependencies({ methods: ["model"], method })
+        this.#optionalDependencies({
+            methods: ["select", "update", "delete"],
+            method,
+        })
+
         this.#checkFields({ method, fields: Object.keys(obj) })
 
         // TODO: subquery is jank no validation or safety
-        if (obj?.not_exists instanceof Query) {
-            this.schema[method] = obj
+        if (obj?.not_exists instanceof QueryBuilder) {
+            this.schema[method] = obj.not_exists
         }
 
         // validation checks
@@ -198,9 +211,10 @@ class Query {
     insert(obj = {}) {
         const method = "insert"
         this.#dependencies({ methods: ["model"], method })
+        this.#uniqueMethod({ methods: ["update", "delete", "select"], method })
 
         // obj = {items: [ {key: value} ],}
-        if (obj?.items instanceof Query) {
+        if (obj?.items instanceof QueryBuilder) {
             const { schema, tables } = obj.items
             if (!(schema?.model && schema?.select))
                 throw new Error(
@@ -247,17 +261,47 @@ class Query {
             })
 
             // check if each entry is a consistent shape
-            if (Object.keys(entry1).length !== keys.length)
-                throw new Error(`${method}: object entries are not equal shape`)
+            this.#error(
+                Object.keys(entry1).length !== keys.length,
+                `${method}: object entries are not equal shape`
+            )
 
             // checks if each entry has the same fields as the initial entry
             for (const key of keys) {
-                if (!Object.keys(entry1).includes(key))
-                    throw new Error(
-                        `${method}: '${key}' does not match key fields with initial entry`
-                    )
+                this.#error(
+                    !Object.keys(entry1).includes(key),
+                    `${method}: '${key}' does not match key fields with initial entry`
+                )
             }
         }
+
+        this.schema[method] = obj
+        return this
+    }
+
+    update(obj = {}) {
+        const method = "update"
+        this.#dependencies({ methods: ["model"], method })
+        this.#uniqueMethod({ methods: ["insert", "delete", "select"], method })
+
+        const [fields, values] = this.#objKeyValue(obj)
+        this.#checkFields({ method, fields })
+        this.#checkValues({ method, values })
+        this.#keysInObject({
+            keys: fields,
+            method,
+            obj: this.tables[this.schema.as ?? this.schema.model],
+            name: this.schema.as ?? this.schema.model,
+        })
+
+        this.schema[method] = obj
+
+        return this
+    }
+
+    delete(obj = {}) {
+        const method = "delete"
+        this.#uniqueMethod({ methods: ["insert", "update", "select"], method })
 
         this.schema[method] = obj
         return this
@@ -266,16 +310,15 @@ class Query {
     // TODO: pls for the love of GOD DO NOT USE without knowing if query works. NO VALIDATION CHECK ON THIS
     with({ subquery, name }) {
         const method = "withQuery"
-        if (!(name || subquery))
-            throw new Error(
-                `${method}: object passed must have 'subquery' and 'name' fields`
-            )
-        if (!(subquery instanceof Query))
-            throw new Error(
-                `${method}: subquery field must be an Query instance`
-            )
-        if (name === "")
-            throw new Error(`${method}: name must not be and empty string`)
+        this.#error(
+            !(name || subquery),
+            `${method}: object passed must have 'subquery' and 'name' fields`
+        )
+        this.#error(
+            !(subquery instanceof QueryBuilder),
+            `${method}: subquery field must be an Query instance`
+        )
+        this.#error(name === "", `${method}: name must not be and empty string`)
 
         this.schema[method] = this.schema[method] || []
         this.schema[method].push({ subquery, name })
@@ -285,7 +328,11 @@ class Query {
     returning(obj = {}) {
         // obj = { tableName: [fields] }
         const method = "returning"
-        this.#dependencies({ methods: ["model", "insert"], method })
+        this.#dependencies({ methods: ["model"], method })
+        this.#optionalDependencies({
+            methods: ["insert", "update", "delete"],
+            method,
+        })
 
         // check if object is empty
         if (Object.keys(obj).length === 0) {
@@ -313,27 +360,49 @@ class Query {
     }
 
     // util methods
+    #uniqueMethod({ methods = [], method = "" }) {
+        this.#error(
+            methods.some((element) => this.#keyInObject(element, this.schema)),
+            `${method}: cannot be called as ${this.#listToString(
+                methods,
+                " or "
+            )} has already be used`
+        )
+    }
+    #optionalDependencies({ methods = [], method = "" }) {
+        this.#error(
+            !methods.some((element) => this.#keyInObject(element, this.schema)),
+            `${method}: one of ${this.#listToString(
+                methods
+            )} methods must be used before '${method}' is envoked`
+        )
+    }
+    #error(conditional = false, errorMessage = "An Error was thrown") {
+        if (conditional) {
+            throw new Error(errorMessage)
+        }
+    }
     #keyInObject(key = "", obj = {}) {
         return obj[key] !== undefined
     }
     #checkFields({ method = "", fields = [] }) {
-        // checks if all object is not empty
-        if (fields.length === 0)
-            throw new Error(
-                `'${method}' method cannot be envoked with empty fields`
-            )
+        this.#error(
+            fields.length === 0,
+            `'${method}' method cannot be envoked with empty fields`
+        )
     }
     #checkValues({ method = "", values = [] }) {
-        // check if all values are not null
-        if (values.length > 0 && values.includes(""))
-            throw new Error(`All values in ${method} object must not be empty`)
+        this.#error(
+            values.length > 0 && values.includes(""),
+            `All values in ${method} object must not be empty`
+        )
     }
-    #dependencies({ methods, method }) {
+    #dependencies({ methods = [], method = "" }) {
         for (let i = 0; i < methods.length; i++) {
-            if (!this.#keyInObject(methods[i], this.schema))
-                throw new Error(
-                    `Method: '${methods[i]}' must be used before using '${method}'`
-                )
+            this.#error(
+                !this.#keyInObject(methods[i], this.schema),
+                `Method: '${methods[i]}' must be used before using '${method}'`
+            )
         }
     }
     #keysInObject({ keys = [], obj = {}, method = "", name = "this.tables" }) {
@@ -432,6 +501,8 @@ class Query {
             returning,
             custom,
             withQuery,
+            update,
+            delete: remove,
         } = obj?.schema ?? this.schema
         let query = ""
 
@@ -473,9 +544,28 @@ class Query {
             }
         }
 
-        if (where && model && select) {
+        if (model && where && update) {
+            const [keys, values] = this.#objKeyValue(update)
+
+            query = this.#append(
+                query,
+                `UPDATE ${model}${as === undefined ? "" : ` as ${as}`} SET`,
+                `(${this.#listToString(keys)}) = (${this.#listToString(
+                    values.map((e) => `'${e}'`)
+                )})`
+            )
+        }
+
+        if (model && where && remove) {
+            query = this.#append(
+                query,
+                `DELETE FROM ${model}${as === undefined ? "" : ` as ${as}`}`
+            )
+        }
+
+        if (where && model && (select || update || remove)) {
             // TODO: abstraction of where not exists subquery is jank need to fix
-            if (where instanceof Query) {
+            if (where instanceof QueryBuilder) {
                 query = this.#append(
                     query,
                     "WHERE NOT EXISTS",
@@ -530,7 +620,7 @@ class Query {
                 "INSERT INTO",
                 `${model} ${as !== undefined ? `as ${as}` : ""}`
             )
-            if (items instanceof Query) {
+            if (items instanceof QueryBuilder) {
                 const { schema } = items
                 query = this.#append(query, `${this.eval({ schema })}`)
             }
@@ -557,7 +647,11 @@ class Query {
             }
         }
 
-        if (returning && model && insert) {
+        if (
+            returning &&
+            model &&
+            (insert || (update && where) || (remove && where))
+        ) {
             if (Object.keys(returning).length === 0)
                 query = this.#append(query, "RETURNING *")
             else {
@@ -575,7 +669,7 @@ class Query {
             }
         }
 
-        // for the love of GOD DO NOT USE WITH IT IS NOT SAFE
+        // for the love of GOD DO NOT USE 'WITH' IT IS NOT SAFE
         if (withQuery) {
             let list = []
             for (let i = 0; i < withQuery.length; i++) {
@@ -603,6 +697,10 @@ class Query {
 
         return query
     }
+
+    getEntities() {
+        return this.#entities
+    }
 }
 
 function entityBuild(model = {}) {
@@ -613,14 +711,14 @@ function entityBuild(model = {}) {
     return obj
 }
 
-function query(schema, tables) {
-    return new Query(schema, tables)
+function QueryFactory(schema, tables) {
+    return new QueryBuilder(schema, tables)
 }
 
-module.exports = query
+module.exports = QueryFactory
 
 if (typeof require !== "undefined" && require.main === module) {
-    const q = query
+    const q = QueryFactory
 
     // testing select queries
     const getUser = q()
@@ -800,4 +898,16 @@ if (typeof require !== "undefined" && require.main === module) {
         .with({ subquery: firstWith, name: "Create_Convo" })
         .with({ subquery: secondWith, name: "First_User" })
         .with({ subquery: finalwith, name: "last" })
+
+    const updateUser = q()
+        .model({ model: "users", as: "a" })
+        .update({ user_uid: "gfnshjk", username: "gfhjdkbhj" })
+        .where({ a: { user_uid: "gfbsdahfks" } })
+        .returning()
+
+    const deleteUser = q()
+        .model({ model: "users" })
+        .delete()
+        .where({ users: { user_uid: "gfbdhjgbrhja" } })
+        .returning()
 }

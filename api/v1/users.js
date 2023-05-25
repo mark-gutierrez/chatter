@@ -1,5 +1,4 @@
 const { users } = require("../../schemas/models")
-
 const { getSchema, patchSchema, deleteSchema } = require("../../schemas/routes")
 
 module.exports = function (fastify, opts, done) {

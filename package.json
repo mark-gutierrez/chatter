@@ -4,7 +4,7 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "test": "nodemon ./services/query.js",
+        "test": "nodemon ./services/schema.js",
         "dev": "nodemon --ext js,html,css index.js",
         "start": "node index.js"
     },

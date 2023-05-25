@@ -14,19 +14,17 @@ module.exports = function (fastify, opts, done) {
         },
         async function (request, reply) {
             let { email, password, username } = request.body
+            password = await fastify.bcrypt.hash(password)
 
             const obj = await fastify.pg.transact(async (client) => {
-                password = await fastify.bcrypt.hash(password)
-
                 const { rows } = await client.query(
                     fastify
                         .q()
                         .model({ model: "users" })
-                        .insert({ email, password, username })
+                        .insert({ items: [{ email, password, username }] })
                         .returning()
-                        .eval(";")
+                        .eval()
                 )
-
                 return rows[0]
             })
 
@@ -56,7 +54,7 @@ module.exports = function (fastify, opts, done) {
                         .model({ model: "users" })
                         .select()
                         .where({ users: { email } })
-                        .eval(";")
+                        .eval()
                 )
 
                 if (rows.length === 0)

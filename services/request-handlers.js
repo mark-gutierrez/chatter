@@ -4,7 +4,7 @@ module.exports = fp(function (fastify, opts, done) {
     fastify.decorate("callback", async function (request, reply) {
         const client = await fastify.pg.connect()
         try {
-            const { rows } = await client.query(fastify.r.build(request))
+            const { rows } = await client.query(fastify.r.resolve(request))
             if (request.method === "GET") {
                 return reply.send({ data: rows })
             } else {

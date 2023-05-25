@@ -52,7 +52,11 @@ module.exports = function (fastify, opts, done) {
 
         const result = await fastify.pg.transact(async (client) => {
             const { rows } = await client.query(
-                fastify.q.model("users").find({ email }).eval()
+                fastify
+                    .q()
+                    .model({ model: "users" })
+                    .select({ users: { email } })
+                    .eval()
             )
 
             if (rows.length === 0)
