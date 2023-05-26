@@ -1,13 +1,14 @@
 // SQL Query Builder
 // NOTE: 'where' subqueries default to WHERE NOT EXISTS
 // NOTE: 'with' method not safe.
+const e = require("./schema")
 
 class QueryBuilder {
     #entities
     constructor(schema, tables) {
         this.schema = schema ?? {}
         this.tables = tables ?? {}
-        this.#entities = entityBuild(require("../schemas/models"))
+        this.#entities = e.getModels()
     }
 
     // used methods
@@ -140,7 +141,8 @@ class QueryBuilder {
 
         // TODO: subquery is jank no validation or safety
         if (obj?.not_exists instanceof QueryBuilder) {
-            this.schema[method] = obj.not_exists
+            this.schema[method] = obj
+            return this
         }
 
         // validation checks
@@ -449,8 +451,10 @@ class QueryBuilder {
             queryList.push(
                 `${custom ? "" : `${table}.`}${key} ${
                     value.includes("$NOT$")
-                        ? `!= '${value.replace("$NOT$", "")}'`
-                        : `= '${value}'`
+                        ? `!= '${value
+                              .replace("$NOT$", "")
+                              .replace("'", "''")}'`
+                        : `= '${value.replace("'", "''")}'`
                 }`
             )
         }
@@ -551,7 +555,7 @@ class QueryBuilder {
                 query,
                 `UPDATE ${model}${as === undefined ? "" : ` as ${as}`} SET`,
                 `(${this.#listToString(keys)}) = (${this.#listToString(
-                    values.map((e) => `'${e}'`)
+                    values.map((e) => `'${e.replace("'", "''")}'`)
                 )})`
             )
         }
@@ -565,11 +569,11 @@ class QueryBuilder {
 
         if (where && model && (select || update || remove)) {
             // TODO: abstraction of where not exists subquery is jank need to fix
-            if (where instanceof QueryBuilder) {
+            if (where?.not_exists instanceof QueryBuilder) {
                 query = this.#append(
                     query,
                     "WHERE NOT EXISTS",
-                    `(${this.eval({ schema: where.schema })})`
+                    `(${this.eval({ schema: where.not_exists.schema })})`
                 )
             } else {
                 let list = []
@@ -631,7 +635,7 @@ class QueryBuilder {
                 for (const item of items) {
                     let innerList = []
                     for (const field of fields) {
-                        innerList.push(`'${item[field]}'`)
+                        innerList.push(`'${item[field].replace("'", "''")}'`)
                     }
                     list.push(`(${this.#listToString(innerList)})`)
                 }
@@ -697,18 +701,6 @@ class QueryBuilder {
 
         return query
     }
-
-    getEntities() {
-        return this.#entities
-    }
-}
-
-function entityBuild(model = {}) {
-    let obj = {}
-    Object.keys(model).forEach((key) => {
-        obj[key] = model[key]()
-    })
-    return obj
 }
 
 function QueryFactory(schema, tables) {
@@ -716,198 +708,3 @@ function QueryFactory(schema, tables) {
 }
 
 module.exports = QueryFactory
-
-if (typeof require !== "undefined" && require.main === module) {
-    const q = QueryFactory
-
-    // testing select queries
-    const getUser = q()
-        .model({ model: "users", as: "b" })
-        .select({ b: ["user_uid", "username", "email"] })
-
-    // testing subqueries
-    const joinedTable = q()
-        .model({ model: "users", as: "a" })
-        .join({
-            model: "user_conversation",
-            as: "b",
-            field: "user_uid",
-            joinTable: "a",
-        })
-        .join({
-            model: "conversations",
-            as: "c",
-            field: "conversation_uid",
-            joinTable: "b",
-        })
-        .select({})
-        .where({
-            a: { username: "mark.gtrez" },
-        })
-        .sort({ a: ["-user_uid"], b: ["conversation_uid"], c: ["datetime"] })
-
-    // meta table coalesce
-    const getMessages = q()
-        .model({ model: joinedTable, as: "messages" })
-        .select({ messages: ["user_uid"] })
-        .where({
-            messages: { username: "mark.gtrez" },
-        })
-        .sort({ messages: ["username", "-email"] })
-        .limit()
-        .offset()
-
-    // insert table
-    const insertUser = q()
-        .model({ model: "users", as: "a" })
-        .insert({
-            items: [
-                {
-                    email: "user@gmail.com",
-                    password: "User1234!",
-                    username: "user",
-                },
-                {
-                    email: "user1@gmail.com",
-                    password: "User1234!",
-                    username: "user1",
-                },
-            ],
-        })
-        .returning({ a: ["user_uid", "username"] })
-
-    const selectUser = q()
-        .model({ model: "users" })
-        .select({ users: ["user_uid", "username", "email"] })
-        .where({ users: { user_uid: "gbfdhjk" } })
-
-    // insert subquery
-    const newUser = q().model({ model: "users" }).insert({ items: selectUser })
-
-    // custom query || no validation || straight from schema
-    const custom = q({
-        model: "Create_Convo",
-        custom: true,
-        as: undefined,
-        select: {
-            Create_Convo: [
-                "805a4fdf-17c5-4410-b8f0-09a0c9852c7e",
-                "conversation_uid",
-            ],
-        },
-    })
-
-    const insertNewUser = q()
-        .model({ model: "user_conversation" })
-        .insert({ items: custom })
-        .returning()
-
-    const user_uid = "74e0c87d-62b5-4f78-a968-c84181086562"
-    const user_uid1 = "805a4fdf-17c5-4410-b8f0-09a0c9852c7e"
-    const user_uid2 = "e4c7bd04-ab93-4869-9298-6b150c9fc8e1"
-    const conversation_uid = "13b7304a-0d80-4b5c-8c49-ef117baf5a5e"
-
-    const getConversationsForUser = q()
-        .model({
-            model: q()
-                .model({ model: "user_conversation" })
-                .select({ user_conversation: ["conversation_uid"] })
-                .where({ user_conversation: { user_uid } }),
-            as: "a",
-        })
-        .join({
-            model: "user_conversation",
-            as: "b",
-            field: "conversation_uid",
-            joinTable: "a",
-        })
-        .join({
-            model: "users",
-            as: "c",
-            field: "user_uid",
-            joinTable: "b",
-        })
-        .select({ b: ["conversation_uid"], c: ["user_uid", "username"] })
-        .where({
-            b: { user_uid: `$NOT$${user_uid}` },
-        })
-
-    const populateMessages = q()
-        .model({
-            model: q()
-                .model({ model: "messages" })
-                .select()
-                .where({ messages: { conversation_uid } }),
-            as: "a",
-        })
-        .join({ model: "users", as: "b", field: "user_uid", joinTable: "a" })
-        .select({
-            a: ["text", "message_uid", "datetime"],
-            b: ["username", "user_uid"],
-        })
-        .sort({ a: ["-datetime"] })
-
-    //  CHECKS IF CONVO EXISTS BETWEEN TWO USERS
-    const convoExists = q()
-        .model({
-            model: q()
-                .model({ model: "user_conversation" })
-                .select()
-                .where({ user_conversation: { user_uid: user_uid1 } }),
-            as: "a",
-        })
-        .join({
-            model: "user_conversation",
-            as: "b",
-            field: "conversation_uid",
-            joinTable: "a",
-        })
-        .select({})
-        .where({ b: { user_uid: user_uid2 } })
-
-    // CREATE CONVERSATION INSTANCE
-    const firstWith = q().model({ model: "conversations" }).insert().returning()
-
-    // INSERT FIRST USER INTO THE CONVERSATION
-    const secondWith = q()
-        .model({ model: "user_conversation" })
-        .insert({
-            items: q({
-                model: "Create_Convo",
-                custom: true,
-                select: { any: [`'${user_uid1}'`, "conversation_uid"] },
-            }),
-        })
-        .returning()
-
-    // INSERT SECOND USER INTO THE CONVEVRSATION
-    const finalwith = q()
-        .model({ model: "user_conversation" })
-        .insert({
-            items: q({
-                model: "Create_Convo",
-                custom: true,
-                select: { any: [`'${user_uid2}'`, "conversation_uid"] },
-                where: convoExists,
-            }),
-        })
-        .returning()
-
-    //  THIS CREATES CONVERSATION IF IT DOES NOT EXIST
-    const createConversation = q()
-        .with({ subquery: firstWith, name: "Create_Convo" })
-        .with({ subquery: secondWith, name: "First_User" })
-        .with({ subquery: finalwith, name: "last" })
-
-    const updateUser = q()
-        .model({ model: "users", as: "a" })
-        .update({ user_uid: "gfnshjk", username: "gfhjdkbhj" })
-        .where({ a: { user_uid: "gfbsdahfks" } })
-        .returning()
-
-    const deleteUser = q()
-        .model({ model: "users" })
-        .delete()
-        .where({ users: { user_uid: "gfbdhjgbrhja" } })
-        .returning()
-}

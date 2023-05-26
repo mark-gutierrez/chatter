@@ -1,6 +1,3 @@
-const { users } = require("../../schemas/models")
-const { getSchema, patchSchema, deleteSchema } = require("../../schemas/routes")
-
 module.exports = function (fastify, opts, done) {
     fastify.addHook("onRequest", fastify.authenticate)
 
@@ -8,18 +5,37 @@ module.exports = function (fastify, opts, done) {
     fastify.get(
         "/",
         {
-            schema: getSchema(users, ["password"]),
+            schema: fastify.s.build({
+                model: "users",
+                method: "GET",
+                response: ["user_uid", "username", "email", "datetime"],
+            }),
         },
         fastify.callback
     )
     fastify.patch(
         "/:id",
         {
-            schema: patchSchema(users, ["user_uid", "datetime", "password"]),
+            schema: fastify.s.build({
+                model: "users",
+                method: "PATCH",
+                request: ["email", "username"],
+                response: ["user_uid", "username", "email", "datetime"],
+            }),
         },
         fastify.callback
     )
-    fastify.delete("/:id", { schema: deleteSchema(users) }, fastify.callback)
+    fastify.delete(
+        "/:id",
+        {
+            schema: fastify.s.build({
+                model: "users",
+                method: "DELETE",
+                response: ["user_uid", "email", "username"],
+            }),
+        },
+        fastify.callback
+    )
 
     done()
 }

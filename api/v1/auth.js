@@ -1,16 +1,17 @@
 const { UnauthenticatedError } = require("../../errors")
-const { users } = require("../../schemas/models")
-const { authSchema } = require("../../schemas/routes")
 
 module.exports = function (fastify, opts, done) {
     fastify.post(
         "/register",
         {
-            schema: authSchema(
-                users,
-                ["email", "password", "username"],
-                ["user_uid", "datetime"]
-            ),
+            schema: fastify.s.build({
+                model: "users",
+                method: "POST",
+                request: ["email", "password", "username"],
+                required: ["email", "password", "username"],
+                response: ["user_uid", "username", "email"],
+                secure: false,
+            }),
         },
         async function (request, reply) {
             let { email, password, username } = request.body
@@ -38,11 +39,14 @@ module.exports = function (fastify, opts, done) {
     fastify.post(
         "/login",
         {
-            schema: authSchema(
-                users,
-                ["email", "password"],
-                ["user_uid", "datetime", "username"]
-            ),
+            schema: fastify.s.build({
+                model: "users",
+                method: "POST",
+                request: ["email", "password"],
+                required: ["email", "password"],
+                response: ["user_uid", "username", "email"],
+                secure: false,
+            }),
         },
         async function (request, reply) {
             let { email, password } = request.body

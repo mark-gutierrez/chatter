@@ -84,7 +84,7 @@ class QueryProxy {
 
     #urlParse(url) {
         const list = this.#stringToList(url, "/")
-        const entities = this.#query.getEntities()
+        const entities = require("./schema").getModels()
         for (const item of list) {
             if (entities[item] !== undefined) return item
         }
@@ -107,56 +107,3 @@ class QueryProxy {
 }
 
 module.exports = QueryProxy.get()
-
-if (typeof require !== "undefined" && require.main === module) {
-    const q = QueryProxy.get()
-
-    const getQuery = q.resolve({
-        query: {
-            select: "user_uid,username",
-            sort: "email,-datetime",
-            page: 3,
-            limit: 2,
-            email: "mark.gtrez@gmail.com",
-            username: "mark.gtrez",
-        },
-        body: {},
-        method: "GET",
-        routerPath: "/api/v1/users",
-        params: { id: "grhbejkbfgjhb" },
-    })
-
-    const postQuery = q.resolve({
-        query: {},
-        body: {
-            username: "user1",
-            email: "user@gmail.com",
-            password: "User1234!",
-        },
-        method: "POST",
-        routerPath: "/api/v1/users",
-        params: { id: "grhbejkbfgjhb" },
-    })
-
-    const updateQuery = q.resolve({
-        query: {},
-        body: {
-            username: "user1",
-            email: "user@gmail.com",
-            password: "User1234!",
-        },
-        method: "PATCH",
-        routerPath: "/api/v1/users/cfghjcgfhxghg",
-        params: { id: "grhbejkbfgjhb" },
-    })
-
-    const deleteQuery = q.resolve({
-        query: {},
-        body: {},
-        method: "DELETE",
-        routerPath: "/api/v1/users/cfghjcjghcgh",
-        params: { id: "grhbejkbfgjhb" },
-    })
-
-    console.log({ getQuery, postQuery, updateQuery, deleteQuery })
-}

@@ -1,12 +1,3 @@
-const { messages } = require("../../schemas/models")
-
-const {
-    getSchema,
-    postSchema,
-    patchSchema,
-    deleteSchema,
-} = require("../../schemas/routes")
-
 module.exports = function (fastify, opts, done) {
     fastify.addHook("onRequest", fastify.authenticate)
 
@@ -14,34 +5,44 @@ module.exports = function (fastify, opts, done) {
     fastify.get(
         "/",
         {
-            schema: getSchema(messages),
+            schema: fastify.s.build({ model: "messages", method: "GET" }),
         },
         fastify.callback
     )
     fastify.post(
         "/",
         {
-            schema: postSchema(
-                messages,
-                ["user_uid", "conversation_uid", "text"],
-                ["message_uid", "datetime"]
-            ),
+            schema: fastify.s.build({
+                model: "messages",
+                request: ["user_uid", "conversation_uid", "text"],
+                required: ["user_uid", "conversation_uid", "text"],
+                method: "POST",
+            }),
         },
         fastify.callback
     )
     fastify.patch(
         "/:id",
         {
-            schema: patchSchema(messages, [
-                "conversation_uid",
-                "datetime",
-                "user_uid",
-                "message_uid",
-            ]),
+            schema: fastify.s.build({
+                model: "messages",
+                request: ["text"],
+                required: ["text"],
+                method: "POST",
+            }),
         },
         fastify.callback
     )
-    fastify.delete("/:id", { schema: deleteSchema(messages) }, fastify.callback)
+    fastify.delete(
+        "/:id",
+        {
+            schema: fastify.s.build({
+                model: "messages",
+                method: "DELETE",
+            }),
+        },
+        fastify.callback
+    )
 
     done()
 }

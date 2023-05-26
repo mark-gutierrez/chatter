@@ -1,7 +1,3 @@
-const { user_conversation } = require("../../schemas/models")
-
-const { getSchema, postSchema } = require("../../schemas/routes")
-
 module.exports = function (fastify, opts, done) {
     fastify.addHook("onRequest", fastify.authenticate)
 
@@ -9,17 +5,21 @@ module.exports = function (fastify, opts, done) {
     fastify.get(
         "/",
         {
-            schema: getSchema(user_conversation),
+            schema: fastify.s.build({
+                model: "user_conversation",
+                method: "GET",
+            }),
         },
         fastify.callback
     )
     fastify.post(
         "/",
         {
-            schema: postSchema(user_conversation, [
-                "user_uid",
-                "conversation_uid",
-            ]),
+            schema: fastify.s.build({
+                model: "user_conversation",
+                method: "POST",
+                required: ["user_uid", "conversation_uid"],
+            }),
         },
         fastify.callback
     )

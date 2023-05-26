@@ -1,26 +1,27 @@
-const { conversations } = require("../../schemas/models")
-
-const { getSchema, postSchema, deleteSchema } = require("../../schemas/routes")
-
 module.exports = function (fastify, opts, done) {
     fastify.addHook("onRequest", fastify.authenticate)
 
     // Conversations route
-    fastify.get("/", { schema: getSchema(conversations) }, fastify.callback)
+    fastify.get(
+        "/",
+        { schema: fastify.s.build({ model: "conversations", method: "GET" }) },
+        fastify.callback
+    )
     fastify.post(
         "/",
         {
-            schema: postSchema(
-                conversations,
-                [],
-                ["conversation_uid", "datetime"]
-            ),
+            schema: fastify.s.build({ model: "conversations", method: "POST" }),
         },
         fastify.callback
     )
     fastify.delete(
         "/:id",
-        { schema: deleteSchema(conversations) },
+        {
+            schema: fastify.s.build({
+                model: "conversations",
+                method: "DELETE",
+            }),
+        },
         fastify.callback
     )
 
