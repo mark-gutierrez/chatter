@@ -11,9 +11,9 @@ module.exports = function (fastify, opts, done) {
                 fastify
                     .q()
                     .model({ model: "users" })
-                    .insert({ email, password, username })
+                    .insert({ items: [{ email, password, username }] })
                     .returning()
-                    .eval(";")
+                    .eval()
             )
 
             return rows
@@ -32,7 +32,7 @@ module.exports = function (fastify, opts, done) {
                     .model({ model: "users" })
                     .select()
                     .where({ users: { email } })
-                    .eval(";")
+                    .eval()
             )
 
             if (rows.length === 0)
