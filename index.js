@@ -1,9 +1,5 @@
 const fastify = require("fastify")({
-    logger: {
-        transport: {
-            target: "pino-pretty",
-        },
-    },
+    logger: true,
 })
 
 // fastify.register(require("@fastify/helmet"))
