@@ -1,4 +1,5 @@
 # chatter
 
-[Chatter Website](https://ambitious-spiced-christmas.glitch.me/)
-[Swagger API](https://ambitious-spiced-christmas.glitch.me/documentation)
+[Chatter Website](https://chatter-app-v1.glitch.me/)
+
+[Swagger API](https://chatter-app-v1.glitch.me/documentation)
