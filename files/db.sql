@@ -32,3 +32,11 @@ CREATE TABLE IF NOT EXISTS Messages
   FOREIGN KEY (user_uid) REFERENCES Users (user_uid),
   FOREIGN KEY (conversation_uid) REFERENCES Conversations (conversation_uid)
 );
+
+CREATE TABLE IF NOT EXISTS Forgot_Password
+(
+  forgot_password_uid      uuid                     NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_uid                 uuid                     NOT NULL UNIQUE,
+  datetime                 timestamptz              NOT NULL DEFAULT now(),
+  FOREIGN KEY (user_uid) REFERENCES Users (user_uid)
+);

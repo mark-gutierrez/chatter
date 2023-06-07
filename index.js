@@ -1,5 +1,9 @@
 const fastify = require("fastify")({
-    logger: true,
+    logger: {
+        transport: {
+            target: "pino-pretty",
+        },
+    },
 })
 
 // fastify.register(require("@fastify/helmet"))
@@ -35,6 +39,7 @@ async function start() {
         // custom plug-ins
         fastify.register(require("./services/plugins"))
         fastify.register(require("./services/request-handlers"))
+        fastify.register(require("./services/emailing"))
 
         // public routes
         fastify.register(require("@fastify/static"), {
