@@ -35,6 +35,11 @@ async function start() {
             options: { maxPayload: 1048576 },
         })
         fastify.register(require("./services/jwt"))
+        fastify.register(require("fastify-favicon"), {
+            path: "./public/img",
+            name: "favicon.ico",
+            maxAge: 3600,
+        })
 
         // custom plug-ins
         fastify.register(require("./services/plugins"))

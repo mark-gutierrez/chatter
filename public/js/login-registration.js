@@ -136,9 +136,9 @@ function Offline() {
     }
 
     return (
-        <div>
+        <div className="content">
             <h1>{page}</h1>
-            {showPopUp && <p>{popUpMessage}</p>}
+            {showPopUp && <p className="popup">{popUpMessage}</p>}
             <form
                 onSubmit={
                     page === "Login"

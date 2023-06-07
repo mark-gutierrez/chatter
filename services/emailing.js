@@ -12,9 +12,7 @@ module.exports = fp(async function (fastify, opts) {
         html = "",
     }) {
         try {
-            const res = await sgMail.send({ to, from, subject, text, html })
-            console.log(res)
-            console.log(`Test email sent successfully`)
+            await sgMail.send({ to, from, subject, text, html })
         } catch (error) {
             console.error(error)
             if (error.response) {

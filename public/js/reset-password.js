@@ -84,10 +84,10 @@ function ResetPassword() {
     }
 
     return (
-        <div>
+        <div className="content">
             <h1>Reset Password</h1>
             <h2>for {email}</h2>
-            {showPopUp && <p>{popUpMessage}</p>}
+            {showPopUp && <p className="popup">{popUpMessage}</p>}
             <form onSubmit={handleResetPassword}>
                 <input
                     type="password"
