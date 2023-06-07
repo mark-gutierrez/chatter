@@ -21,6 +21,15 @@ module.exports = {
             JWT_SECRET: {
                 type: "string",
             },
+            SENDGRID_API_KEY: {
+                type: "string",
+            },
+            WEBSITE: {
+                type: "string",
+            },
+            ENV: {
+                type: "string",
+            },
         },
     },
     dotenv: {

@@ -39,6 +39,11 @@ class SchemaSingleton {
                 user_uid: { type: "string", format: "uuid" },
                 conversation_uid: { type: "string", format: "uuid" },
             },
+            forgot_password: {
+                forgot_password_uid: { type: "string", format: "uuid" },
+                user_uid: { type: "string", format: "uuid" },
+                datetime: { type: "string" },
+            },
         }
         this.#getquery = {
             select: { type: "string" },

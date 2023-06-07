@@ -1,7 +1,7 @@
 const { useState, useEffect, useRef, Component } = React
 
 function Offline() {
-    const [page, setPage] = useState(true)
+    const [page, setPage] = useState("Login")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [testPassword, setTestPassword] = useState("")
@@ -32,6 +32,13 @@ function Offline() {
 
     async function handleLogin(e) {
         e.preventDefault()
+
+        if (email === "" || password === "") {
+            setPopUpMessage("Email and Password must not be empty")
+            showPopupHandler()
+            return
+        }
+
         const { data, message } = await postData("/login", {
             email: `${email.toLowerCase()}`,
             password,
@@ -71,13 +78,46 @@ function Offline() {
 
         if (error) {
             setPopUpMessage("User email already registered")
-            setPage(!page)
+            setPage("Login")
             showPopupHandler()
         }
 
         if (data) {
-            setPage(!page)
+            setPage("Login")
             setPopUpMessage("Successful Regristration!")
+            showPopupHandler()
+        }
+    }
+
+    async function handleForgotPassword(e) {
+        e.preventDefault()
+
+        if (!isEmail(email)) {
+            setPopUpMessage("Invalid Email")
+            showPopupHandler()
+            return
+        }
+
+        const { data, error } = await postData("/forgot-password", {
+            email: `${email.toLowerCase()}`,
+            password,
+        })
+
+        if (error) {
+            const errorMessage =
+                error === "Bad Request"
+                    ? "Email to reset password was already sent. Please wait 5 mins before requesting again"
+                    : error === "Unauthorized"
+                    ? "Email does not exist"
+                    : "Something went wrong"
+            setPopUpMessage(errorMessage)
+            showPopupHandler()
+            return
+        }
+
+        if (data) {
+            setPage("Login")
+            setPopUpMessage("Email Successfully Sent")
             showPopupHandler()
         }
     }
@@ -102,9 +142,17 @@ function Offline() {
 
     return (
         <div>
-            <h1>{page ? "Login" : "Register"}</h1>
+            <h1>{page}</h1>
             {showPopUp && <p>{popUpMessage}</p>}
-            <form onSubmit={page ? handleLogin : handleRegister}>
+            <form
+                onSubmit={
+                    page === "Login"
+                        ? handleLogin
+                        : page === "Register"
+                        ? handleRegister
+                        : handleForgotPassword
+                }
+            >
                 <input
                     type="email"
                     name="email"
@@ -112,14 +160,16 @@ function Offline() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                 />
-                <input
-                    type="password"
-                    name="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                />
-                {!page && (
+                {(page === "Login" || page === "Register") && (
+                    <input
+                        type="password"
+                        name="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+                )}
+                {page === "Register" && (
                     <input
                         type="password"
                         name="confirm-password"
@@ -130,20 +180,42 @@ function Offline() {
                 )}
                 <button
                     type="submit"
-                    onClick={page ? handleLogin : handleRegister}
+                    onClick={
+                        page === "Login"
+                            ? handleLogin
+                            : page === "Register"
+                            ? handleRegister
+                            : handleForgotPassword
+                    }
                 >
-                    {page ? "Log in" : "Register"}
+                    {page}
                 </button>
             </form>
 
             <button
                 type="button"
                 onClick={() => {
-                    setPage(!page)
+                    if (page === "Login") setPage("Register")
+                    if (page === "Register" || page === "Reset Password")
+                        setPage("Login")
                 }}
             >
-                {page ? "Don't have an account?" : "Already have an account?"}
+                {page === "Login"
+                    ? "Don't have an account?"
+                    : page === "Register"
+                    ? "Already have an account?"
+                    : "Return to Login"}
             </button>
+            {page === "Login" && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        setPage("Reset Password")
+                    }}
+                >
+                    Forgot Password?
+                </button>
+            )}
         </div>
     )
 }
