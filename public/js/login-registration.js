@@ -70,21 +70,22 @@ function Offline() {
             return
         }
 
-        const { data, error } = await postData("/register", {
+        const { data, error, message } = await postData("/register", {
             email: `${email.toLowerCase()}`,
             password,
             username: `${email.split("@")[0]}`,
         })
 
         if (error) {
-            setPopUpMessage("User email already registered")
-            setPage("Login")
+            setPopUpMessage(message || error)
             showPopupHandler()
         }
 
         if (data) {
             setPage("Login")
-            setPopUpMessage("Successful Regristration!")
+            setPopUpMessage(
+                "Successful Regristration! Check Email to Verify Account"
+            )
             showPopupHandler()
         }
     }
@@ -98,19 +99,13 @@ function Offline() {
             return
         }
 
-        const { data, error } = await postData("/forgot-password", {
+        const { data, error, message } = await postData("/forgot-password", {
             email: `${email.toLowerCase()}`,
             password,
         })
 
         if (error) {
-            const errorMessage =
-                error === "Bad Request"
-                    ? "Email to reset password was already sent. Please wait 5 mins before requesting again"
-                    : error === "Unauthorized"
-                    ? "Email does not exist"
-                    : "Something went wrong"
-            setPopUpMessage(errorMessage)
+            setPopUpMessage(message || error)
             showPopupHandler()
             return
         }

@@ -44,6 +44,17 @@ class SchemaSingleton {
                 user_uid: { type: "string", format: "uuid" },
                 datetime: { type: "string" },
             },
+            registrations: {
+                registration_uid: { type: "string", format: "uuid" },
+                email: { type: "string", format: "email" },
+                password: {
+                    type: "string",
+                    pattern:
+                        "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$ %^&*-]).{8,}$",
+                },
+                datetime: { type: "string" },
+                username: { type: "string", minLength: 1 },
+            },
         }
         this.#getquery = {
             select: { type: "string" },

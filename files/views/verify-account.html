@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Chatter</title>
+    </head>
+    <body>
+        <h1>{{email}} successfully verified!</h1>
+
+        <p id="countdown"></p>
+
+        <script>
+            let count = 4
+            setInterval(function () {
+                document.getElementById(
+                    "countdown"
+                ).innerHTML = `Redirecting in ${count}...`
+                count -= 1
+            }, 1000)
+            setTimeout(function () {
+                window.location.replace("/")
+            }, 5000)
+        </script>
+    </body>
+</html>

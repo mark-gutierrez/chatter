@@ -40,3 +40,12 @@ CREATE TABLE IF NOT EXISTS Forgot_Password
   datetime                 timestamptz              NOT NULL DEFAULT now(),
   FOREIGN KEY (user_uid) REFERENCES Users (user_uid)
 );
+
+CREATE TABLE IF NOT EXISTS Registrations
+(
+  registration_uid uuid                 NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email            varchar(320)         NOT NULL UNIQUE CONSTRAINT email_length CHECK (char_length(email) >= 1),
+  password         varchar(355)         NOT NULL CONSTRAINT password_length CHECK (char_length(password) >= 1),
+  datetime         timestamptz          NOT NULL DEFAULT now(),
+  username         varchar(320)         NOT NULL CONSTRAINT username_length CHECK (char_length(username) >= 1)
+)
