@@ -3,6 +3,7 @@ const socket = new WebSocket(
     (window.location.protocol === "https:" ? "wss://" : "ws://") +
         window.location.host
 )
+const seenStorage = JSON.parse(localStorage.getItem("seen")) || {}
 
 function Online() {
     const [username, setUsername] = useState("")
@@ -15,6 +16,7 @@ function Online() {
     const [messages, setMessages] = useState([])
     const [text, setText] = useState("")
     const [searchedUsers, setSearchedUsers] = useState([])
+    const [seen, setSeen] = useState({})
 
     socket.onopen = function (event) {
         socket.send(JSON.stringify({ type: "init" }))
@@ -28,18 +30,25 @@ function Online() {
             const { userConvos, userMessages } = data
             let obj = {}
             let obj1 = {}
+            let obj2 = {}
 
             for (let { conversation_uid, username } of userConvos) {
                 obj[conversation_uid] = obj[conversation_uid] || username
                 obj1[conversation_uid] = obj1[conversation_uid] || []
+                obj2[conversation_uid] = obj2[conversation_uid] || 0
             }
 
             for (let message of userMessages) {
                 obj1[message.conversation_uid].push(message)
             }
 
+            for (let [key, value] of Object.entries(seenStorage)) {
+                obj2[key] = value
+            }
+
             setUserConvos(obj)
             setConvoData(obj1)
+            setSeen(obj2)
         }
 
         if (data.type === "sendMessage") {
@@ -63,6 +72,10 @@ function Online() {
         const newUserConvo = JSON.parse(JSON.stringify(userConvos))
         newUserConvo[conversation_uid] = username
         setUserConvos(newUserConvo)
+        const obj = { ...seen }
+        obj[conversation_uid] = 0
+        setSeen(obj)
+        localStorage.setItem("seen", JSON.stringify(obj))
         socket.send(
             JSON.stringify({
                 type: "addNewConvo",
@@ -78,6 +91,10 @@ function Online() {
         setConvoData(conversations)
         if (conversation_uid === convoWith.conversation_uid) {
             setMessages([...messages, data])
+            const obj = { ...seen }
+            obj[conversation_uid] = convoData[conversation_uid].length + 1
+            setSeen(obj)
+            localStorage.setItem("seen", JSON.stringify(obj))
         }
     }
 
@@ -101,6 +118,11 @@ function Online() {
             })
             setMessages(convoData[conversation_uid])
         }
+
+        const obj = { ...seen }
+        obj[conversation_uid] = convoData[conversation_uid].length
+        setSeen(obj)
+        localStorage.setItem("seen", JSON.stringify(obj))
     }
 
     function handleSubmitMessage(e) {
@@ -140,6 +162,8 @@ function Online() {
                                         value={conversation_uid}
                                     >
                                         {username}
+                                        {convoData[conversation_uid].length !==
+                                            seen[conversation_uid] && " new"}
                                     </button>
                                 </li>
                             )
