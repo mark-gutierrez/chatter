@@ -144,53 +144,72 @@ function Online() {
 
     return (
         <div>
-            <h1>Hi {username}</h1>
-            <Navbar />
-            <SearchUser
-                searchedUsers={searchedUsers}
-                setSearchedUsers={setSearchedUsers}
-            />
-            <div>
-                <h2>Chatters</h2>
-                <ul>
-                    {Object.keys(userConvos).length > 0 &&
-                        Object.entries(userConvos).map(
-                            ([conversation_uid, username]) => (
-                                <li key={conversation_uid}>
-                                    <button
-                                        onClick={handleClickConversation}
-                                        value={conversation_uid}
-                                    >
-                                        {username}
-                                        {convoData[conversation_uid].length !==
-                                            seen[conversation_uid] && " new"}
-                                    </button>
-                                </li>
-                            )
+            <nav>
+                <h1>Hi {username}</h1>
+                <Navbar />
+            </nav>
+            <main>
+                <section>
+                    <SearchUser
+                        searchedUsers={searchedUsers}
+                        setSearchedUsers={setSearchedUsers}
+                    />
+                    <h2>Chatters</h2>
+                    <ul>
+                        {Object.keys(userConvos).length > 0 &&
+                            Object.entries(userConvos).map(
+                                ([conversation_uid, username]) => (
+                                    <li key={conversation_uid}>
+                                        <button
+                                            onClick={handleClickConversation}
+                                            value={conversation_uid}
+                                        >
+                                            {username}
+                                            {convoData[conversation_uid]
+                                                .length !==
+                                                seen[conversation_uid] &&
+                                                " new"}
+                                        </button>
+                                    </li>
+                                )
+                            )}
+                    </ul>
+                </section>
+                <section>
+                    <div>
+                        {convoWith.username !== "" && (
+                            <h2>{convoWith.username}</h2>
                         )}
-                </ul>
-            </div>
-            <div>
-                {convoWith.username !== "" && <h2>{convoWith.username}</h2>}
-                <ul>
-                    {messages.length > 0 &&
-                        messages.map(({ message_uid, text, username }) => (
-                            <li key={message_uid}>
-                                {username}: {text}
-                            </li>
-                        ))}
-                </ul>
-                {convoWith.username !== "" && (
-                    <form onSubmit={handleSubmitMessage}>
-                        <input
-                            type="text"
-                            name="text"
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                        ></input>
-                    </form>
-                )}
-            </div>
+                    </div>
+                    <div className="messages">
+                        <div className="messages-1">
+                            <ul>
+                                {messages.length > 0 &&
+                                    messages.map(
+                                        ({ message_uid, text, username }) => (
+                                            <li key={message_uid}>
+                                                {username}: {text}
+                                            </li>
+                                        )
+                                    )}
+                            </ul>
+                        </div>
+                    </div>
+                    <div className="input-container">
+                        {convoWith.username !== "" && (
+                            <form onSubmit={handleSubmitMessage}>
+                                <input
+                                    className="input"
+                                    type="text"
+                                    name="text"
+                                    value={text}
+                                    onChange={(e) => setText(e.target.value)}
+                                ></input>
+                            </form>
+                        )}
+                    </div>
+                </section>
+            </main>
         </div>
     )
 }
@@ -233,7 +252,7 @@ function SearchUser({ searchedUsers, setSearchedUsers }) {
     }
 
     return (
-        <div>
+        <div className="full-width">
             <button type="button" onClick={handleClickNewChatter}>
                 {searchUsersButton ? "-" : "+"} New Chatter
             </button>
@@ -248,21 +267,23 @@ function SearchUser({ searchedUsers, setSearchedUsers }) {
                 </form>
             )}
             {searchUsersButton && (
-                <ul>
-                    {searchedUsers.length > 0 &&
-                        searchedUsers.map(({ user_uid, username }) => {
-                            return (
-                                <li key={user_uid}>
-                                    <button
-                                        onClick={addNewChatter}
-                                        value={user_uid}
-                                    >
-                                        + {username}
-                                    </button>
-                                </li>
-                            )
-                        })}
-                </ul>
+                <div className="searchUsers">
+                    <ul>
+                        {searchedUsers.length > 0 &&
+                            searchedUsers.map(({ user_uid, username }) => {
+                                return (
+                                    <li key={user_uid}>
+                                        <button
+                                            onClick={addNewChatter}
+                                            value={user_uid}
+                                        >
+                                            + {username}
+                                        </button>
+                                    </li>
+                                )
+                            })}
+                    </ul>
+                </div>
             )}
         </div>
     )
@@ -283,15 +304,13 @@ function Navbar() {
         }
     }
     return (
-        <nav>
-            <ol>
-                <li>
-                    <button type="button" onClick={logout}>
-                        Logout
-                    </button>
-                </li>
-            </ol>
-        </nav>
+        <ol>
+            <li>
+                <button type="button" onClick={logout}>
+                    Logout
+                </button>
+            </li>
+        </ol>
     )
 }
 
