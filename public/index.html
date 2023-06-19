@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Chat app made simple" />
+        <meta name="keywords" content="Chat, Real time, Messaging, Sockets" />
+        <meta name="author" content="Mark Gutierrez" />
+        <link rel="stylesheet" href="style.css" />
+        <script src="script.js" async defer></script>
+        <link rel="icon" href="favicon.ico" />
+        <title>Chatter</title>
+    </head>
+    <body>
+        <main>
+            <section id="offline-page" hidden>
+                <form id="offline-form">
+                    <fieldset>
+                        <legend id="form-header">Login</legend>
+                        <div id="popup"></div>
+                        <input
+                            id="email"
+                            type="email"
+                            name="email"
+                            placeholder="Email address"
+                        />
+                        <input
+                            id="password"
+                            type="password"
+                            name="password"
+                            placeholder="Password"
+                        />
+                        <input
+                            id="confirm-password"
+                            type="password"
+                            name="confirmPassword"
+                            placeholder="Confirm password"
+                            hidden
+                        />
+                        <button id="submit-offline" type="submit">Login</button>
+                        <a id="a-google" href="/login/google"
+                            ><button id="google-login" type="button">
+                                Login with Google
+                            </button></a
+                        >
+                        <a id="a-github" href="/login/github"
+                            ><button id="github-login" type="button">
+                                Login with Github
+                            </button>
+                        </a>
+                        <a href="#" id="toggle">Don't have an account?</a>
+                        <a href="#" id="forgot-password">Forgot password?</a>
+                    </fieldset>
+                </form>
+            </section>
+            <section id="online-page" hidden>
+                <nav>
+                    <h1 id="username">Username</h1>
+                    <button id="logout" type="button">Logout</button>
+                </nav>
+                <section id="app">
+                    <section id="chatters">
+                        <section id="add-chatters">
+                            <button type="button" id="add-new-chatter">
+                                Add New Chatter
+                            </button>
+                            <form id="search-chatter-form">
+                                <input
+                                    id="search-chatter"
+                                    name="newChatter"
+                                    placeholder="Search Chatter"
+                                    type="text"
+                                    hidden
+                                />
+                            </form>
+                            <section id="add-chatters-list"></section>
+                        </section>
+                        <section id="current-chatters">
+                            <h2>Chatters</h2>
+                            <section id="current-chatters-list"></section>
+                        </section>
+                    </section>
+                    <section id="current-chat">
+                        <h2 id="current-chatter"></h2>
+                        <section id="messages"></section>
+                        <section id="messages-input-section">
+                            <form id="messages-input-form">
+                                <input
+                                    id="messages-input"
+                                    name="text"
+                                    placeholder="Aa"
+                                    type="text"
+                                    disabled
+                                />
+                            </form>
+                        </section>
+                    </section>
+                </section>
+            </section>
+        </main>
+    </body>
+</html>

@@ -5,93 +5,55 @@ const fastify = require("fastify")({
         },
     },
 })
-
-// fastify.register(require("@fastify/helmet"))
-
-async function start() {
+;(async function () {
     try {
-        // plug-ins
-        fastify.register(require("@fastify/formbody"))
-        fastify.register(require("@fastify/multipart"))
-        await fastify.register(require("@fastify/cors"))
-        await fastify.register(require("@fastify/compress"))
+        // depndencies plugins
         await fastify.register(require("@fastify/rate-limit"), {
             max: 100,
             timeWindow: "1 minute",
         })
-        await fastify.register(
-            require("@fastify/env"),
-            require("./schemas/env")
-        )
-        fastify.register(require("@fastify/cookie"))
-        fastify.register(require("@fastify/session"), {
-            secret: fastify.config.SESSION_SECRET,
-            cookie: { secure: false },
-            expires: 3600000,
-        })
-        fastify.register(require("fastify-bcrypt"))
-        fastify.register(require("@fastify/websocket"), {
-            handle: (conn, req) => conn.pipe(conn),
-            options: { maxPayload: 1048576 },
-        })
-        fastify.register(require("./services/jwt"))
-        fastify.register(require("fastify-favicon"), {
-            path: "./public/img",
-            name: "favicon.ico",
-            maxAge: 3600,
-        })
+        await fastify.register(require("@fastify/compress"))
+        await fastify.register(require("@fastify/cors"))
+        fastify
+            .register(require("@fastify/helmet"))
+            .register(require("@fastify/formbody"))
+            .register(require("@fastify/static"), {
+                root: require("node:path").join(__dirname, "public"),
+            })
+            .register(require("@fastify/postgres"), {
+                connectionString: process.env.DATABASE_URL,
+            })
+            .register(require("fastify-bcrypt"), {
+                saltWorkFactor: 12,
+            })
+            .register(require("@fastify/cookie"))
+            .register(require("@fastify/session"), {
+                secret: process.env.SESSION_SECRET,
+                cookie: { secure: "auto" },
+                expires: 3600000,
+            })
+            .register(require("@fastify/websocket"), {
+                handle: (conn, req) => conn.pipe(conn),
+                options: { maxPayload: 1048576 },
+            })
 
-        // custom plug-ins
-        fastify.register(require("./services/plugins"))
-        fastify.register(require("./services/request-handlers"))
-        fastify.register(require("./services/emailing"))
+        // custom plugins
+        fastify
+            .register(require("./services/build-db"))
+            .register(require("./services/email"))
+            .register(require("./services/offline"))
+            .register(require("./services/oauth"))
+            .register(require("./services/online"))
 
-        // public routes
-        fastify.register(require("@fastify/static"), {
-            root: require("node:path").join(__dirname, "public"),
-        })
-
-        // web routes
-        fastify.register(require("./web/offline"))
-        fastify.register(require("./web/online"))
-
-        // api routes
-        fastify.register(require("./api"), { prefix: "/api" })
-
-        await fastify.register(require("@fastify/swagger"), {
-            mode: "static",
-            specification: {
-                path: "./files/swagger-api-v1.yaml",
-            },
-        })
-        await fastify.register(require("@fastify/swagger-ui"))
-
-        // connect to DB
-        fastify.register(require("@fastify/postgres"), {
-            connectionString: fastify.config.DATABASE_URL,
-        })
-        fastify.register(require("./services/build-db"))
-        fastify.ready((err) => {
-            if (err) {
-                console.error(err)
-            }
-            fastify.swagger()
-        })
-
-        fastify.setErrorHandler(require("./services/error-handler"))
-
-        await fastify.listen({ port: fastify.config.PORT })
-    } catch (err) {
-        fastify.log.error(err)
+        await fastify.listen({ port: process.env.PORT })
+    } catch (error) {
+        fastify.log.error(error)
         process.exit(1)
     }
-}
-
+})()
 ;["SIGINT", "SIGTERM"].forEach((signal) => {
     process.on(signal, async () => {
         await fastify.close()
         process.exit(0)
     })
 })
-
-start()

@@ -1,0 +1,296 @@
+/* CSS reset */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+* {
+    margin: 0;
+}
+body {
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-family: Arial, Helvetica, sans-serif;
+}
+img,
+picture,
+video,
+canvas,
+svg {
+    display: block;
+    max-width: 100%;
+}
+input,
+button,
+textarea,
+select {
+    font: inherit;
+}
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    overflow-wrap: break-word;
+}
+#root,
+#__next {
+    isolation: isolate;
+}
+[hidden] {
+    display: none !important;
+}
+
+/* Actual Content */
+*::-webkit-scrollbar {
+    width: 0.5rem;
+}
+*::-webkit-scrollbar-track {
+    background: black;
+}
+*::-webkit-scrollbar-thumb {
+    background: white;
+}
+
+/* OFFLINE PAGE */
+#offline-form {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+fieldset {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    border-radius: 1rem;
+    border: 0.2rem solid black;
+    gap: 0.3rem;
+}
+fieldset legend {
+    font-size: xx-large;
+    font-weight: bold;
+}
+#popup {
+    border: none;
+    font-size: x-large;
+}
+fieldset input {
+    width: 100%;
+    font-size: x-large;
+    padding: 0.5rem 1rem;
+    border: 0.125rem solid black;
+    border-radius: 0.3rem;
+}
+fieldset button {
+    padding: 0.5rem 1rem;
+    width: 100%;
+    background-color: black;
+    color: white;
+    font-size: x-large;
+    border: none;
+    border-radius: 0.3rem;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+fieldset button:hover {
+    opacity: 0.8;
+}
+fieldset button:active {
+    opacity: 0.5;
+}
+fieldset a {
+    text-decoration: none;
+}
+fieldset > button > a {
+    color: white;
+}
+#toggle,
+#forgot-password,
+#toggle:visited,
+#forgot-password:visited {
+    color: black;
+    font-size: large;
+}
+#toggle:hover,
+#forgot-password:hover {
+    text-decoration: underline;
+}
+#a-google,
+#a-github {
+    width: 100%;
+}
+
+/* ONLINE PAGE */
+#online-page {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 1rem;
+    gap: 1rem;
+}
+
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 0.2rem solid black;
+    border-radius: 0.5rem;
+    padding: 0.3rem;
+    min-width: 20rem;
+}
+#username {
+    font-size: x-large;
+    font-weight: bold;
+}
+#logout {
+    background-color: black;
+    color: white;
+    border: 0.2rem solid black;
+    border-radius: 0.3rem;
+    cursor: pointer;
+    padding: 0.3rem 0.8rem;
+    font-size: large;
+    font-weight: bold;
+    transition: background-color 0.15s, color 0.15s;
+}
+#logout:hover {
+    background-color: white;
+    color: black;
+}
+#logout:active {
+    background-color: black;
+    color: white;
+}
+#app {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    flex: 1;
+    min-width: 20rem;
+}
+#app > section {
+    border: 0.2rem solid black;
+    border-radius: 0.5rem;
+}
+#chatters {
+    flex: 3;
+    min-height: 90vh;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+}
+#chatters > section {
+    margin: 1rem;
+    border: 0.2rem solid black;
+    padding: 0.3rem;
+    border-radius: 0.5rem;
+    width: 95%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+}
+#add-chatters-list,
+#current-chatters-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    max-height: 30vh;
+    overflow-y: scroll;
+}
+
+#search-chatter {
+    width: 100%;
+    font-size: x-large;
+    padding: 0.5rem 1rem;
+    border: 0.125rem solid black;
+    border-radius: 0.3rem;
+}
+#chatters button {
+    padding: 0.5rem 1rem;
+    width: 100%;
+    background-color: black;
+    color: white;
+    font-size: x-large;
+    border: 0.2rem solid black;
+    border-radius: 0.3rem;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+#chatters button:hover {
+    background-color: white;
+    color: black;
+}
+#chatters button:active {
+    background-color: black;
+    color: white;
+}
+#current-chat {
+    flex: 7;
+    min-height: 90vh;
+}
+
+#current-chat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+}
+#current-chatter {
+    font-size: xx-large;
+    height: 3rem;
+}
+#messages {
+    border: 0.2rem solid black;
+    border-radius: 0.5rem;
+    width: 100%;
+    height: 90%;
+    max-height: 90%;
+    overflow-y: scroll;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding: 2rem;
+}
+.message-user {
+    font-size: small;
+    color: gray;
+}
+.message-text {
+    border: 0.1rem solid black;
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.8rem;
+    font-size: large;
+}
+.message-self {
+    display: flex;
+    flex-direction: column;
+    align-items: end;
+}
+.message-other {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+}
+
+#messages-input-section,
+#messages-input-form {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+#messages-input {
+    width: 100%;
+    font-size: x-large;
+    padding: 0.5rem 1rem;
+    border: 0.2rem solid black;
+    border-radius: 0.3rem;
+}
