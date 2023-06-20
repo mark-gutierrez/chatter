@@ -267,6 +267,10 @@ const messagesInput = qs("#messages-input")
 const messagesInputForm = qs("#messages-input-form")
 const messagesSection = qs("#messages")
 
+const menu = qs("#menu")
+const chattersSection = qs("#chatters")
+const currentChatSection = qs("#current-chat")
+
 // ONLINE UI EVENTS
 logout.onclick = handleLogout
 async function handleLogout() {
@@ -276,6 +280,24 @@ async function handleLogout() {
         removeElementsFromParent(currentChattersList, "button")
         setVisibility({ objects: [offlinePage] })
         setVisibility({ show: false, objects: [onlinePage] })
+    }
+}
+
+menu.onclick = handleMenu
+function handleMenu() {
+    if (currentChatSection.style.display === "flex") {
+        chattersSection.style.display = "flex"
+        currentChatSection.style.display = "none"
+
+        // destroy messages view
+        currentChatter.textContent = ""
+        messagesInputForm.reset()
+        messagesInput.setAttribute("disabled", "")
+        current_conversation_uid = ""
+        removeElementsFromParent(messagesSection, "div")
+    } else {
+        chattersSection.style.display = "none"
+        currentChatSection.style.display = "flex"
     }
 }
 
@@ -352,6 +374,7 @@ function handleInit(data) {
     for (let i = 0; i < data.userMessages.length; i++) {
         insertDB("messages", data.userMessages[i])
     }
+    evalSeen()
 }
 
 // Functions to Search and Add chatters
@@ -383,6 +406,7 @@ function handleAddUser(newChatter) {
     currentChattersList.append(button)
 
     //add to indexDB
+    newChatter.seen = 0
     insertDB("conversations", newChatter)
 }
 
@@ -401,6 +425,11 @@ function handleClickCurrentChatter(e) {
         messagesInput.removeAttribute("disabled")
         current_conversation_uid = e.target.value
         getMessagesDB(e.target.value)
+        updateSeen(e.target.value, e.target.innerText)
+
+        // mobile
+        const width = window.innerWidth > 0 ? window.innerWidth : screen.width
+        if (width < 480) handleMenu()
     }
 }
 
@@ -417,10 +446,12 @@ function handleMessageSubmit(e) {
 }
 
 function handleNewMessage(message) {
-    if (current_conversation_uid === message.conversation_uid)
-        renderNewMessage(message)
-
     insertDB("messages", message)
+    if (current_conversation_uid === message.conversation_uid) {
+        renderNewMessage(message)
+    } else {
+        evalSeen()
+    }
 }
 
 function renderNewMessage(message) {
@@ -491,7 +522,6 @@ function lastDatetimeConnectSocket() {
     let store = tx.objectStore("messages")
     const query = store.getAll()
     query.onsuccess = function () {
-        console.log("indexQuery", query.result)
         const last = query.result
             .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
             ?.pop()
@@ -512,6 +542,10 @@ function getMessagesDB(search = "") {
         query.result
             .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
             .forEach((msg) => renderNewMessage(msg))
+        messagesSection.scroll({
+            top: messagesSection.scrollHeight,
+            behavior: "smooth",
+        })
     }
     query.onerror = (err) => {
         console.warn(err)
@@ -525,8 +559,6 @@ function makeTX(storeName, mode) {
     }
     return tx
 }
-
-// IndexedDB Schemas
 
 function chatterSchema(e) {
     let db = e.target.result
@@ -551,15 +583,63 @@ function chatterSchema(e) {
     })
 }
 
-function userSchema(e) {
-    let db = e.target.result
-    console.log(`DB updated from version ${e.oldVersion} to ${e.newVersion}`)
-    if (db.objectStoreNames.contains("users")) {
-        db.deleteObjectStore("users")
+// Seen unseen Functionality
+function evalSeen() {
+    const chatters = currentChattersList.children
+
+    for (let i = 0; i < chatters.length; i++) {
+        let tx = makeTX("conversations", "readonly")
+        let store = tx.objectStore("conversations")
+        const query = store.get(chatters[i].value)
+
+        query.onsuccess = function () {
+            console.log("query", query.result)
+            let tx1 = makeTX("messages", "readonly")
+            let store1 = tx1.objectStore("messages")
+            const indexed = store1.index("conversation_uid_index")
+            const query1 = indexed.getAll(query.result.conversation_uid)
+
+            query1.onsuccess = function () {
+                console.log("query", query1.result)
+                if (query.result.seen !== query1.result.length) {
+                    chatters[i].style.background = "purple"
+                } else {
+                    chatters[i].style.background = ""
+                }
+            }
+            query1.onerror = (err) => {
+                console.warn(err)
+            }
+        }
+        query.onerror = (err) => {
+            console.warn(err)
+        }
     }
-    db.createObjectStore("users", {
-        keyPath: "user_uid",
-    })
+}
+
+function updateSeen(conversation_uid, username) {
+    let tx = makeTX("messages", "readonly")
+    let store = tx.objectStore("messages")
+    const indexed = store.index("conversation_uid_index")
+    const query = indexed.getAll(conversation_uid)
+    query.onsuccess = function () {
+        let tx1 = makeTX("conversations", "readwrite")
+        let store1 = tx1.objectStore("conversations")
+        const query1 = store1.put({
+            conversation_uid,
+            username,
+            seen: query.result.length,
+        })
+        query1.onsuccess = function () {
+            evalSeen()
+        }
+        query1.onerror = function (err) {
+            console.warn(err)
+        }
+    }
+    query.onerror = (err) => {
+        console.warn(err)
+    }
 }
 
 window.addEventListener("load", checkOnline)
