@@ -362,7 +362,9 @@ function connectSocket(datetime = "") {
         }
     }
 
-    onclose = (event) => {}
+    socket.onclose = (event) => {
+        console.log("disconnected")
+    }
 }
 
 function handleInit(data) {
@@ -449,6 +451,11 @@ function handleNewMessage(message) {
     insertDB("messages", message)
     if (current_conversation_uid === message.conversation_uid) {
         renderNewMessage(message)
+        messagesSection.scroll({
+            top: messagesSection.scrollHeight,
+            behavior: "auto",
+        })
+        updateSeen(message.conversation_uid, message.username)
     } else {
         evalSeen()
     }
@@ -513,7 +520,7 @@ function insertDB(storeName = "", obj = {}, cb = []) {
         cb.forEach((fn) => fn())
     }
     request.onerror = (err) => {
-        console.log("error in request to add")
+        console.warn(err)
     }
 }
 
@@ -538,7 +545,6 @@ function getMessagesDB(search = "") {
     const indexed = store.index("conversation_uid_index")
     const query = indexed.getAll(search)
     query.onsuccess = function () {
-        console.log("indexQuery", query.result)
         query.result
             .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
             .forEach((msg) => renderNewMessage(msg))
@@ -593,14 +599,12 @@ function evalSeen() {
         const query = store.get(chatters[i].value)
 
         query.onsuccess = function () {
-            console.log("query", query.result)
             let tx1 = makeTX("messages", "readonly")
             let store1 = tx1.objectStore("messages")
             const indexed = store1.index("conversation_uid_index")
             const query1 = indexed.getAll(query.result.conversation_uid)
 
             query1.onsuccess = function () {
-                console.log("query", query1.result)
                 if (query.result.seen !== query1.result.length) {
                     chatters[i].style.background = "purple"
                 } else {
