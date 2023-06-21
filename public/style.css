@@ -11,6 +11,7 @@ body {
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     font-family: Arial, Helvetica, sans-serif;
+    position: relative;
 }
 img,
 picture,
@@ -43,7 +44,7 @@ h6 {
     display: none !important;
 }
 
-/* Actual Content */
+/* custom css */
 *::-webkit-scrollbar {
     width: 0.5rem;
 }
@@ -51,63 +52,46 @@ h6 {
     background: black;
 }
 *::-webkit-scrollbar-thumb {
-    background: white;
+    background: purple;
 }
 
-/* OFFLINE PAGE */
-#offline-form {
+main {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-}
-fieldset {
-    display: flex;
-    justify-content: center;
-    align-items: center;
     flex-direction: column;
-    border-radius: 1rem;
-    border: 0.2rem solid black;
-    gap: 0.3rem;
+    justify-content: center;
+    align-items: center;
 }
-fieldset legend {
+
+.online,
+.offline {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+.offline {
+    gap: 0.1rem;
+    border: 0.3rem solid black;
+    border-radius: 1rem;
+}
+.offline * {
+    width: 100%;
+    text-align: center;
+}
+legend {
     font-size: xx-large;
     font-weight: bold;
+    width: auto !important;
 }
-#popup {
-    border: none;
-    font-size: x-large;
-}
-fieldset input {
-    width: 100%;
-    font-size: x-large;
-    padding: 0.5rem 1rem;
-    border: 0.125rem solid black;
-    border-radius: 0.3rem;
-}
-fieldset button {
-    padding: 0.5rem 1rem;
-    width: 100%;
-    background-color: black;
-    color: white;
-    font-size: x-large;
-    border: none;
-    border-radius: 0.3rem;
-    cursor: pointer;
-    transition: opacity 0.15s;
-}
-fieldset button:hover {
-    opacity: 0.8;
-}
-fieldset button:active {
-    opacity: 0.5;
-}
-fieldset a {
-    text-decoration: none;
-}
-fieldset > button > a {
-    color: white;
-}
+
 #toggle,
 #forgot-password,
 #toggle:visited,
@@ -119,147 +103,169 @@ fieldset > button > a {
 #forgot-password:hover {
     text-decoration: underline;
 }
-#a-google,
-#a-github {
-    width: 100%;
+#popup {
+    border: none;
+    font-size: x-large;
 }
 
-/* ONLINE PAGE */
-#online-page {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 1rem;
-    gap: 1rem;
-}
+.nav {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    height: 3rem;
+    border: 0.2rem solid black;
 
-nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 0.2rem solid black;
-    border-radius: 0.5rem;
     padding: 0.3rem;
-    min-width: 20rem;
 }
-#username {
-    font-size: x-large;
-    font-weight: bold;
-}
-#logout {
+
+.logout {
     background-color: black;
     color: white;
+    font-weight: bold;
     border: 0.2rem solid black;
     border-radius: 0.3rem;
-    cursor: pointer;
-    padding: 0.3rem 0.8rem;
-    font-size: large;
-    font-weight: bold;
     transition: background-color 0.15s, color 0.15s;
 }
-#logout:hover {
-    background-color: white;
-    color: black;
-}
-#logout:active {
+
+.menu {
     background-color: black;
-    color: white;
-}
-#app {
-    display: flex;
-    flex-direction: row;
-    gap: 1rem;
-    flex: 1;
-    min-width: 20rem;
-}
-#app > section {
     border: 0.2rem solid black;
-    border-radius: 0.5rem;
+    border-radius: 0.3rem;
+    flex-direction: column;
+    display: none;
 }
-#chatters {
-    flex: 3;
-    min-height: 90vh;
+.menu span {
+    background-color: white;
+    border: 0.2rem solid white;
+    border-radius: 0.1rem;
+    margin: 0.1rem;
+    width: 1.5rem;
+}
+
+.chatter {
+    position: absolute;
+    top: 4rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    border: 0.2rem solid black;
 
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.1rem;
-}
-#chatters > section {
-    margin: 1rem;
-    border: 0.2rem solid black;
     padding: 0.3rem;
-    border-radius: 0.5rem;
-    width: 95%;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    flex: 1;
+    gap: 0.3rem;
 }
-#add-chatters-list,
-#current-chatters-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    max-height: 30vh;
-    overflow-y: scroll;
-}
-
-#search-chatter {
+.chatter input,
+.offline input {
     width: 100%;
     font-size: x-large;
-    padding: 0.5rem 1rem;
+    padding: 0.1rem 0.5rem;
     border: 0.125rem solid black;
     border-radius: 0.3rem;
 }
-#chatters button {
-    padding: 0.5rem 1rem;
-    width: 100%;
+
+.side-bar {
+    border: 0.2rem solid black;
+    flex: 3;
+    position: relative;
+}
+.side-bar button,
+.offline button {
     background-color: black;
     color: white;
     font-size: x-large;
     border: 0.2rem solid black;
     border-radius: 0.3rem;
-    cursor: pointer;
     transition: background-color 0.15s, color 0.15s;
 }
-#chatters button:hover {
+.side-bar button:hover,
+.logout:hover,
+.offline button:hover {
     background-color: white;
     color: black;
 }
-#chatters button:active {
+.side-bar button:active,
+.logout:active,
+.offline button:active {
     background-color: black;
     color: white;
 }
-#current-chat {
-    flex: 7;
-    min-height: 90vh;
+
+.add-chatters {
+    top: 0;
+    left: 0;
+    right: 0;
+}
+.current-chatters {
+    right: 0;
+    left: 0;
+    bottom: 0;
 }
 
-#current-chat {
+.add-chatters,
+.current-chatters {
+    position: absolute;
+    min-height: 50%;
+    max-height: 50%;
+    border: 0.1rem solid black;
+
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1rem;
+    gap: 0.1rem;
+    padding: 0.2rem;
 }
-#current-chatter {
-    font-size: xx-large;
-    height: 3rem;
-}
-#messages {
-    border: 0.2rem solid black;
-    border-radius: 0.5rem;
+.add-chatters *,
+.current-chatters * {
     width: 100%;
-    height: 90%;
-    max-height: 80vh;
+}
+
+.current-chatters-title {
+    text-align: center;
+}
+
+.chatters-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    max-height: 100%;
     overflow-y: scroll;
+}
+
+.chat {
+    border: 0.2rem solid black;
+    flex: 7;
+
+    position: relative;
+}
+
+.chat > * {
+    width: 100%;
+    position: absolute;
+    left: 0;
+    right: 0;
+}
+
+.chatter-username {
+    top: 0.1rem;
+    text-align: center;
+}
+.messages {
+    border: 0.2rem solid black;
+    top: 3rem;
+    bottom: 3rem;
+
+    padding: 2rem;
     display: flex;
     flex-direction: column;
     gap: 2rem;
-    padding: 2rem;
+
+    max-height: 100%;
+    overflow-y: scroll;
 }
+
 .message-user {
     font-size: small;
     color: gray;
@@ -281,44 +287,18 @@ nav {
     align-items: start;
 }
 
-#messages-input-section,
-#messages-input-form {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-}
-#messages-input {
-    width: 100%;
-    font-size: x-large;
-    padding: 0.5rem 1rem;
-    border: 0.2rem solid black;
-    border-radius: 0.3rem;
+.messages-form {
+    bottom: 0.1rem;
 }
 
-/* Mobile */
-
-#menu {
-    background-color: black;
-    border: 0.2rem solid black;
-    border-radius: 0.3rem;
-    cursor: pointer;
-    display: none;
-}
-#menu span {
-    height: 0.1rem;
-    width: 1rem;
-    background-color: white;
-    border: 10px;
-    display: block;
-    margin: 0.38rem;
-}
-
-@media only screen and (min-device-width: 320px) and (max-device-width: 480px) {
-    #menu {
-        display: block;
+@media only screen and (min-device-width: 280px) and (max-device-width: 480px) {
+    .menu {
+        display: flex;
     }
-
-    #current-chat {
+    /* .side-bar {
+        display: none;
+    } */
+    .chat {
         display: none;
     }
 }

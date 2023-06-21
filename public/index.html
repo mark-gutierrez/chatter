@@ -15,7 +15,7 @@
         <main>
             <section id="offline-page" hidden>
                 <form id="offline-form">
-                    <fieldset>
+                    <fieldset class="offline">
                         <legend id="form-header">Login</legend>
                         <div id="popup"></div>
                         <input
@@ -53,17 +53,19 @@
                     </fieldset>
                 </form>
             </section>
-            <section id="online-page" hidden>
-                <nav>
-                    <button type="button" id="menu">
+            <section id="online-page" class="online" hidden>
+                <nav class="nav">
+                    <button type="button" class="menu" id="menu">
                         <span></span><span></span><span></span>
                     </button>
-                    <h1 id="username">Username</h1>
-                    <button id="logout" type="button">Logout</button>
+                    <h2 class="username" id="username">Username</h2>
+                    <button type="button" class="logout" id="logout">
+                        Logout
+                    </button>
                 </nav>
-                <section id="app">
-                    <section id="chatters">
-                        <section id="add-chatters">
+                <section class="chatter" id="app">
+                    <section class="side-bar" id="chatters">
+                        <section class="add-chatters" id="add-chatters">
                             <button type="button" id="add-new-chatter">
                                 Add New Chatter
                             </button>
@@ -76,27 +78,33 @@
                                     hidden
                                 />
                             </form>
-                            <section id="add-chatters-list"></section>
+                            <section
+                                class="chatters-list"
+                                id="add-chatters-list"
+                            ></section>
                         </section>
-                        <section id="current-chatters">
-                            <h2>Chatters</h2>
-                            <section id="current-chatters-list"></section>
+                        <section class="current-chatters" id="current-chatters">
+                            <h2 class="current-chatters-title">Chatters</h2>
+                            <section
+                                class="chatters-list"
+                                id="current-chatters-list"
+                            ></section>
                         </section>
                     </section>
-                    <section id="current-chat">
-                        <h2 id="current-chatter"></h2>
-                        <section id="messages"></section>
-                        <section id="messages-input-section">
-                            <form id="messages-input-form">
-                                <input
-                                    id="messages-input"
-                                    name="text"
-                                    placeholder="Aa"
-                                    type="text"
-                                    disabled
-                                />
-                            </form>
-                        </section>
+                    <section class="chat" id="current-chat">
+                        <h2 class="chatter-username" id="current-chatter">
+                            User
+                        </h2>
+                        <section class="messages" id="messages"></section>
+                        <form class="messages-form" id="messages-input-form">
+                            <input
+                                id="messages-input"
+                                name="text"
+                                placeholder="Aa"
+                                type="text"
+                                disabled
+                            />
+                        </form>
                     </section>
                 </section>
             </section>
