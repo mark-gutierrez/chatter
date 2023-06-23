@@ -160,6 +160,7 @@ async function handleOfflineSubmit(e) {
         window.history.pushState({}, d.title, "/")
         if (handler === "/login") {
             my_user_uid = data
+            offlineForm.reset()
             renderChatter()
         }
         return
@@ -646,4 +647,36 @@ function updateSeen(conversation_uid, username) {
     }
 }
 
-window.addEventListener("load", checkOnline)
+// Service Worker
+async function registerServiceWorker() {
+    if ("serviceWorker" in navigator) {
+        try {
+            let registration = await navigator.serviceWorker.register(
+                "/sw.js",
+                {
+                    scope: "/",
+                }
+            )
+            if (registration.installing) {
+                console.log("Service worker installing")
+            } else if (registration.waiting) {
+                console.log("Service worker installed")
+            } else if (registration.active) {
+                console.log("Service worker active")
+            }
+
+            navigator.serviceWorker.addEventListener("controllerchange", () => {
+                registration = navigator.serviceWorker.controller
+            })
+        } catch (error) {
+            console.error(`Registration failed with ${error}`)
+        }
+    }
+}
+
+// onload
+
+window.addEventListener("load", function () {
+    checkOnline()
+    registerServiceWorker()
+})

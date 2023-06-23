@@ -34,7 +34,13 @@ const fastify = require("fastify")({
             })
             .register(require("@fastify/websocket"), {
                 handle: (conn, req) => conn.pipe(conn),
-                options: { maxPayload: 1048576 },
+                options: {
+                    maxPayload: 1048576,
+                    verifyClient: function (info, next) {
+                        console.log(info.req.headers)
+                        next(true) // the connection is allowed
+                    },
+                },
             })
 
         // custom plugins
