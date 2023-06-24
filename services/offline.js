@@ -164,7 +164,11 @@ module.exports = function (fastify, opts, done) {
                 throw new Error(`${email} account has not yet been verified`)
 
             request.session.user = obj
-            reply.code(200).send({ data: obj.user_uid })
+            reply
+                .code(200)
+                .send({
+                    data: { user_uid: obj.user_uid, username: obj.username },
+                })
         }
     )
 

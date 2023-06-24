@@ -36,10 +36,6 @@ const fastify = require("fastify")({
                 handle: (conn, req) => conn.pipe(conn),
                 options: {
                     maxPayload: 1048576,
-                    verifyClient: function (info, next) {
-                        console.log(info.req.headers)
-                        next(true) // the connection is allowed
-                    },
                 },
             })
 

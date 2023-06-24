@@ -1,8 +1,8 @@
 const d = document
+const n = navigator
 let socket = ""
 let my_user_uid = ""
 let current_conversation_uid = ""
-let db = ""
 
 // offline UI
 const offlinePage = qs("#offline-page")
@@ -69,6 +69,7 @@ function renderForgotPassword() {
 
 function renderResetPassword() {
     formHeader.textContent = "New Password"
+    offlineButton.textContent = "Reset Password"
     setVisibility({
         objects: [confirmPassowrd],
     })
@@ -76,7 +77,6 @@ function renderResetPassword() {
         show: false,
         objects: [emailInput, toggle, forgotPassword, googleLogin, githubLogin],
     })
-    offlineButton.textContent = "Reset Password"
 }
 
 // offline functionality
@@ -159,7 +159,6 @@ async function handleOfflineSubmit(e) {
             toggleOfflineForm()
         window.history.pushState({}, d.title, "/")
         if (handler === "/login") {
-            my_user_uid = data
             offlineForm.reset()
             renderChatter()
         }
@@ -227,10 +226,20 @@ function removeElementsFromParent(parent, elements) {
         element[0].parentNode.removeChild(element[0])
     }
 }
+function rmElements(element) {
+    while (element.firstChild) {
+        element.removeChild(element.firstChild)
+    }
+}
 async function checkOnline(e) {
     const { ok, user_uid } = await fetch("/is-online")
         .then((res) => res.json())
-        .catch((err) => setVisibility({ objects: [offlinePage] }))
+        .catch((err) => {
+            setVisibility({ objects: [offlinePage] })
+            if (!n.onLine) {
+                sendSWMessage({ type: "offlineMode" })
+            }
+        })
     if (ok === true) {
         my_user_uid = user_uid
         renderChatter()
@@ -277,10 +286,14 @@ logout.onclick = handleLogout
 async function handleLogout() {
     const { loggedOut } = await postData("/logout")
     if (loggedOut === true) {
-        removeElementsFromParent(messagesSection, "div")
-        removeElementsFromParent(currentChattersList, "button")
+        my_user_uid = ""
+        current_conversation_uid = ""
+        currentChatter.textContent = "User"
+        rmElements(messagesSection)
+        rmElements(currentChattersList)
         setVisibility({ objects: [offlinePage] })
         setVisibility({ show: false, objects: [onlinePage] })
+        sendSWMessage({ type: "logout", data: my_user_uid })
     }
 }
 
@@ -295,7 +308,7 @@ function handleMenu() {
         messagesInputForm.reset()
         messagesInput.setAttribute("disabled", "")
         current_conversation_uid = ""
-        removeElementsFromParent(messagesSection, "div")
+        rmElements(messagesSection)
     } else {
         chattersSection.style.display = "none"
         currentChatSection.style.display = "flex"
@@ -310,14 +323,14 @@ function handleAddNewChatterButton() {
         return
     }
     setVisibility({ show: false, objects: [searchNewChatter] })
-    removeElementsFromParent(addChattersList, "button")
+    rmElements(addChattersList)
     searchNewChatterForm.reset()
 }
 
 searchNewChatterForm.onsubmit = handleAddNewChatterSubmit
 async function handleAddNewChatterSubmit(e) {
     e.preventDefault()
-    removeElementsFromParent(addChattersList, "button")
+    rmElements(addChattersList)
     const formData = new FormData(searchNewChatterForm)
     const { newChatter } = Object.fromEntries(formData)
     send({ type: "search", data: newChatter })
@@ -327,7 +340,7 @@ async function handleAddNewChatterSubmit(e) {
 function renderChatter() {
     setVisibility({ show: false, objects: [offlinePage] })
     setVisibility({ objects: [onlinePage] })
-    initDB(my_user_uid, postLogin)
+    sendSWMessage({ type: "login" })
 }
 
 function connectSocket(datetime = "") {
@@ -371,13 +384,24 @@ function connectSocket(datetime = "") {
 function handleInit(data) {
     my_user_uid = data.user_uid
     username.textContent = data.username
+    sendSWMessage({
+        type: "addUser",
+        data: { user_uid: data.user_uid, username: data.username },
+    })
+    rmElements(currentChattersList)
     for (let i = 0; i < data.userConvos.length; i++) {
         handleAddUser(data.userConvos[i])
     }
     for (let i = 0; i < data.userMessages.length; i++) {
-        insertDB("messages", data.userMessages[i])
+        sendSWMessage({
+            type: "addMessage",
+            data: { user_uid: my_user_uid, message: data.userMessages[i] },
+        })
     }
-    evalSeen()
+    sendSWMessage({
+        type: "evalSeen",
+        data: { user_uid: data.user_uid },
+    })
 }
 
 // Functions to Search and Add chatters
@@ -401,16 +425,23 @@ function handleClickNewChatter(e) {
     handleAddNewChatterButton()
 }
 
-function handleAddUser(newChatter) {
+function renderCurrentChatter(newChatter) {
     const button = d.createElement("button")
     button.textContent = newChatter.username
     button.value = newChatter.conversation_uid
     button.addEventListener("click", handleClickCurrentChatter)
     currentChattersList.append(button)
+}
+
+function handleAddUser(newChatter) {
+    renderCurrentChatter(newChatter)
 
     //add to indexDB
     newChatter.seen = 0
-    insertDB("conversations", newChatter)
+    sendSWMessage({
+        type: "addConvo",
+        data: { user_uid: my_user_uid, newChatter },
+    })
 }
 
 // Messages Functionality
@@ -421,14 +452,21 @@ function handleClickCurrentChatter(e) {
         messagesInputForm.reset()
         messagesInput.setAttribute("disabled", "")
         current_conversation_uid = ""
-        removeElementsFromParent(messagesSection, "div")
+        rmElements(messagesSection)
     } else {
-        removeElementsFromParent(messagesSection, "div")
+        rmElements(messagesSection)
         currentChatter.textContent = e.target.innerText
         messagesInput.removeAttribute("disabled")
         current_conversation_uid = e.target.value
-        getMessagesDB(e.target.value)
-        updateSeen(e.target.value, e.target.innerText)
+        sendSWMessage({
+            type: "getMessages",
+            data: {
+                conversation_uid: e.target.value,
+                user_uid: my_user_uid,
+                username: e.target.innerText,
+            },
+        })
+        e.target.style.background = ""
 
         // mobile
         const width = window.innerWidth > 0 ? window.innerWidth : screen.width
@@ -449,16 +487,31 @@ function handleMessageSubmit(e) {
 }
 
 function handleNewMessage(message) {
-    insertDB("messages", message)
+    sendSWMessage({
+        type: "addMessage",
+        data: { user_uid: my_user_uid, message },
+    })
     if (current_conversation_uid === message.conversation_uid) {
         renderNewMessage(message)
         messagesSection.scroll({
             top: messagesSection.scrollHeight,
             behavior: "auto",
         })
-        updateSeen(message.conversation_uid, message.username)
+        sendSWMessage({
+            type: "updateSeen",
+            data: {
+                conversation_uid: message.conversation_uid,
+                username: currentChatter.textContent,
+                user_uid: my_user_uid,
+            },
+        })
     } else {
-        evalSeen()
+        sendSWMessage({
+            type: "evalSeen",
+            data: {
+                user_uid: my_user_uid,
+            },
+        })
     }
 }
 
@@ -487,190 +540,86 @@ function renderNewMessage(message) {
     messagesSection.append(fragment)
 }
 
-// IndexedDB Functionality
-
-function initDB(dbname, onSuccess, onUpgrade = chatterSchema, version = 1) {
-    const indexedDB =
-        window.indexedDB ||
-        window.mozIndexedDB ||
-        window.webkitIndexedDB ||
-        window.msIndexedDB ||
-        window.shimIndexedDB
-
-    let request = indexedDB.open(dbname, version)
-
-    request.onerror = function (err) {
-        console.warn(err)
-    }
-
-    request.onsuccess = onSuccess
-
-    request.onupgradeneeded = onUpgrade
-}
-
-function postLogin(e) {
-    db = e.target.result
-    lastDatetimeConnectSocket()
-}
-
-function insertDB(storeName = "", obj = {}, cb = []) {
-    let tx = makeTX(storeName, "readwrite")
-    let store = tx.objectStore(storeName)
-    let request = store.add(obj)
-    request.onsuccess = (e) => {
-        cb.forEach((fn) => fn())
-    }
-    request.onerror = (err) => {
-        console.warn(err)
+// Service Worker
+async function serviceWorker() {
+    if ("serviceWorker" in n) {
+        try {
+            let sw = await n.serviceWorker.register("/sw.js", {
+                scope: "/",
+            })
+            n.serviceWorker.addEventListener("controllerchange", () => {
+                sw = n.serviceWorker.controller
+            })
+            n.serviceWorker.addEventListener("message", handleSWMessage)
+        } catch (error) {
+            console.error(`Registration failed with ${error}`)
+        }
     }
 }
 
-function lastDatetimeConnectSocket() {
-    let tx = makeTX("messages", "readonly")
-    let store = tx.objectStore("messages")
-    const query = store.getAll()
-    query.onsuccess = function () {
-        const last = query.result
-            .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
-            ?.pop()
-        connectSocket(last?.datetime)
-    }
-    query.onerror = (err) => {
-        console.warn(err)
-    }
-}
+function handleSWMessage(e) {
+    const { type, data } = e.data
 
-function getMessagesDB(search = "") {
-    let tx = makeTX("messages", "readonly")
-    let store = tx.objectStore("messages")
-    const indexed = store.index("conversation_uid_index")
-    const query = indexed.getAll(search)
-    query.onsuccess = function () {
-        query.result
-            .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
-            .forEach((msg) => renderNewMessage(msg))
+    if (type === "login") {
+        if (data === undefined) {
+            connectSocket()
+        } else {
+            my_user_uid = data?.user_uid
+            username.textContent = data?.username
+            connectSocket(data?.last)
+        }
+    }
+
+    if (type === "logout") {
+        console.log(`successful logout ${my_user_uid}`)
+    }
+
+    if (type === "getMessages") {
+        data.sort(
+            (a, b) => new Date(a.datetime) - new Date(b.datetime)
+        ).forEach((msg) => renderNewMessage(msg))
         messagesSection.scroll({
             top: messagesSection.scrollHeight,
             behavior: "smooth",
         })
     }
-    query.onerror = (err) => {
-        console.warn(err)
-    }
-}
 
-function makeTX(storeName, mode) {
-    let tx = db.transaction(storeName, mode)
-    tx.onerror = (err) => {
-        console.warn(err)
-    }
-    return tx
-}
-
-function chatterSchema(e) {
-    let db = e.target.result
-    console.log(`DB updated from version ${e.oldVersion} to ${e.newVersion}`)
-
-    if (db.objectStoreNames.contains("conversations")) {
-        db.deleteObjectStore("conversations")
-    }
-    if (db.objectStoreNames.contains("messages")) {
-        db.deleteObjectStore("messages")
+    if (type === "evalSeen") {
+        const chatters = currentChattersList.children
+        for (let i = 0; i < chatters.length; i++) {
+            chatters[i].style.background = data[chatters[i].value]
+        }
     }
 
-    db.createObjectStore("conversations", {
-        keyPath: "conversation_uid",
-    })
-    let messages = db.createObjectStore("messages", {
-        keyPath: "message_uid",
-    })
-
-    messages.createIndex("conversation_uid_index", "conversation_uid", {
-        unique: false,
-    })
-}
-
-// Seen unseen Functionality
-function evalSeen() {
-    const chatters = currentChattersList.children
-
-    for (let i = 0; i < chatters.length; i++) {
-        let tx = makeTX("conversations", "readonly")
-        let store = tx.objectStore("conversations")
-        const query = store.get(chatters[i].value)
-
-        query.onsuccess = function () {
-            let tx1 = makeTX("messages", "readonly")
-            let store1 = tx1.objectStore("messages")
-            const indexed = store1.index("conversation_uid_index")
-            const query1 = indexed.getAll(query.result.conversation_uid)
-
-            query1.onsuccess = function () {
-                if (query.result.seen !== query1.result.length) {
-                    chatters[i].style.background = "purple"
-                } else {
-                    chatters[i].style.background = ""
-                }
+    if (type === "offlineMode") {
+        initDB(data.user_uid, (e) => {
+            db = e.target.result
+            my_user_uid = data.user_uid
+            username.textContent = data.username
+            rmElements(currentChattersList)
+            for (let i = 0; i < data.userConvos.length; i++) {
+                renderCurrentChatter(data.userConvos[i])
             }
-            query1.onerror = (err) => {
-                console.warn(err)
-            }
-        }
-        query.onerror = (err) => {
-            console.warn(err)
-        }
-    }
-}
-
-function updateSeen(conversation_uid, username) {
-    let tx = makeTX("messages", "readonly")
-    let store = tx.objectStore("messages")
-    const indexed = store.index("conversation_uid_index")
-    const query = indexed.getAll(conversation_uid)
-    query.onsuccess = function () {
-        let tx1 = makeTX("conversations", "readwrite")
-        let store1 = tx1.objectStore("conversations")
-        const query1 = store1.put({
-            conversation_uid,
-            username,
-            seen: query.result.length,
-        })
-        query1.onsuccess = function () {
-            evalSeen()
-        }
-        query1.onerror = function (err) {
-            console.warn(err)
-        }
-    }
-    query.onerror = (err) => {
-        console.warn(err)
-    }
-}
-
-// Service Worker
-async function registerServiceWorker() {
-    if ("serviceWorker" in navigator) {
-        try {
-            let registration = await navigator.serviceWorker.register(
-                "/sw.js",
-                {
-                    scope: "/",
-                }
-            )
-            if (registration.installing) {
-                console.log("Service worker installing")
-            } else if (registration.waiting) {
-                console.log("Service worker installed")
-            } else if (registration.active) {
-                console.log("Service worker active")
-            }
-
-            navigator.serviceWorker.addEventListener("controllerchange", () => {
-                registration = navigator.serviceWorker.controller
+            setVisibility({
+                show: false,
+                objects: [offlinePage],
             })
-        } catch (error) {
-            console.error(`Registration failed with ${error}`)
-        }
+            setVisibility({ objects: [onlinePage] })
+        })
+    }
+}
+
+async function sendSWMessage(obj = {}) {
+    const sw = await n.serviceWorker.ready
+    sw.active.postMessage(obj)
+}
+
+// onload
+async function init() {
+    await serviceWorker()
+
+    if (!n.onLine) {
+        sendSWMessage({ type: "offlineMode" })
     }
 }
 
@@ -678,5 +627,5 @@ async function registerServiceWorker() {
 
 window.addEventListener("load", function () {
     checkOnline()
-    registerServiceWorker()
+    init()
 })
