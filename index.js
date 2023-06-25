@@ -32,6 +32,9 @@ const fastify = require("fastify")({
                 cookie: { secure: "auto" },
                 expires: 3600000,
             })
+            .register(require("@fastify/jwt"), {
+                secret: process.env.JWT_SECRET,
+            })
             .register(require("@fastify/websocket"), {
                 handle: (conn, req) => conn.pipe(conn),
                 options: {

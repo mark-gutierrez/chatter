@@ -1,4 +1,15 @@
 module.exports = function (fastify, opts, done) {
+    fastify.post("/reconnect", async function (request, reply) {
+        const { username, user_uid, jwt } = request.body
+        const decoded = fastify.jwt.verify(jwt)
+        if (decoded.user_uid === user_uid && decoded.username === username) {
+            request.session.user = decoded
+            return reply.send({ authenticated: true })
+        } else {
+            return reply.send({ authenticated: false })
+        }
+    })
+
     fastify.get(
         "/is-online",
         {
@@ -125,6 +136,7 @@ module.exports = function (fastify, opts, done) {
                     userConvos,
                     userMessages,
                     user_uid,
+                    jwt: fastify.jwt.sign(req.session.user),
                 })
             }
 
@@ -228,7 +240,7 @@ module.exports = function (fastify, opts, done) {
         })
 
         conn.socket.on("close", (code, reason) => {
-            console.log(`${req.session.user.username} left the server`)
+            console.log(`${req.session?.user?.username} left the server`)
             Object.keys(convos).forEach((convo) =>
                 leave(convo, req.session?.user?.user_uid)
             )

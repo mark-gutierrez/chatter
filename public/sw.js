@@ -1,32 +1,32 @@
-const version = "v1"
+const version = "v9"
 
 self.addEventListener("install", (event) => {
-    // event.waitUntil(
-    //     addResourcesToCache([
-    //         "/",
-    //         "index.html",
-    //         "/style.css",
-    //         "/script.js",
-    //         "/favicon.ico",
-    //         "/404.png",
-    //     ])
-    // )
+    event.waitUntil(
+        addResourcesToCache([
+            "/",
+            "index.html",
+            "/style.css",
+            "/script.js",
+            "/favicon.ico",
+            "/404.png",
+        ])
+    )
     console.log("installed")
 })
 
-// self.addEventListener("fetch", (event) => {
-//     if (event.request.url.startsWith(self.location.origin)) {
-//         event.respondWith(
-//             cacheFirst({
-//                 request: event.request,
-//                 fallbackUrl: "/404.png",
-//             })
-//         )
-//     }
-// })
+self.addEventListener("fetch", (event) => {
+    if (event.request.url.startsWith(self.location.origin)) {
+        event.respondWith(
+            cacheFirst({
+                request: event.request,
+                fallbackUrl: "/404.png",
+            })
+        )
+    }
+})
 
 self.addEventListener("activate", (event) => {
-    // event.waitUntil(deleteOldCaches())
+    event.waitUntil(deleteOldCaches())
     console.log("activated")
 })
 
@@ -34,7 +34,14 @@ self.addEventListener("message", async (e) => {
     console.log("message received", e.data, e.source.id)
     const { type, data } = e.data
     if (type === "init") {
-        await sendClientMessage({ type, data: "hello" })
+        const userDB = await db("user")
+        const user = await userDB.get("user")
+
+        if (user.length !== 1) {
+            await sendClientMessage({ type, data: undefined })
+            return
+        }
+        await sendClientMessage({ type, data: user[0] })
     }
     if (type === "login") {
         const userDB = await db("user")
@@ -56,20 +63,18 @@ self.addEventListener("message", async (e) => {
 
         await sendClientMessage({
             type,
-            data: { user_uid, username, last: last?.datetime },
+            data: last?.datetime,
         })
     }
     if (type === "addUser") {
         const userDB = await db("user")
         await userDB.insert("user", data)
     }
-
     if (type === "addConvo") {
         const { user_uid, newChatter } = data
         const conversationDB = await db(user_uid)
         await conversationDB.insert("conversations", newChatter)
     }
-
     if (type === "getMessages") {
         const { conversation_uid, user_uid, username } = data
         const DB = await db(user_uid)
@@ -89,7 +94,6 @@ self.addEventListener("message", async (e) => {
             data: messages,
         })
     }
-
     if (type === "updateSeen") {
         const { conversation_uid, user_uid, username } = data
         const DB = await db(user_uid)
@@ -104,7 +108,6 @@ self.addEventListener("message", async (e) => {
             seen: messages.length,
         })
     }
-
     if (type === "evalSeen") {
         const { user_uid } = data
         const DB = await db(user_uid)
@@ -129,19 +132,16 @@ self.addEventListener("message", async (e) => {
 
         await sendClientMessage({ type, data: obj })
     }
-
     if (type === "addMessage") {
         const { user_uid, message } = data
         const DB = await db(user_uid)
         await DB.insert("messages", message)
     }
-
     if (type === "logout") {
         const userDB = await db("user")
         await userDB.delete("user", data)
         await sendClientMessage({ type })
     }
-
     if (type === "offlineMode") {
         const userDB = await db("user")
         const userId = await userDB.get("user")
@@ -149,7 +149,7 @@ self.addEventListener("message", async (e) => {
         if (userId.length !== 1) return
 
         const { user_uid, username } = userId[0]
-
+        console.log(user_uid)
         const offlineDB = await db(user_uid)
         const userConvos = await offlineDB.get("conversations")
         await sendClientMessage({
@@ -160,6 +160,11 @@ self.addEventListener("message", async (e) => {
                 userConvos,
             },
         })
+    }
+    if (type === "reconnect") {
+        const userDB = await db("user")
+        const user = await userDB.get("user")
+        await sendClientMessage({ type, data: user[0] })
     }
 })
 

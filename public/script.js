@@ -18,6 +18,9 @@ const popup = qs("#popup")
 const googleLogin = qs("#google-login")
 const githubLogin = qs("#github-login")
 
+googleLogin.onclick = () => localStorage.setItem("oauth", "google")
+githubLogin.onclick = () => localStorage.setItem("oauth", "github")
+
 toggle.onclick = toggleOfflineForm
 function toggleOfflineForm() {
     if (formHeader.innerText === "Login") {
@@ -220,32 +223,17 @@ function setVisibility({ show = true, objects = [] }) {
 function send(object = {}) {
     socket.send(JSON.stringify(object))
 }
-function removeElementsFromParent(parent, elements) {
-    const element = parent.getElementsByTagName(elements)
-    while (element.length) {
-        element[0].parentNode.removeChild(element[0])
-    }
-}
 function rmElements(element) {
     while (element.firstChild) {
         element.removeChild(element.firstChild)
     }
 }
 async function checkOnline(e) {
-    const { ok, user_uid } = await fetch("/is-online")
-        .then((res) => res.json())
-        .catch((err) => {
-            setVisibility({ objects: [offlinePage] })
-            if (!n.onLine) {
-                sendSWMessage({ type: "offlineMode" })
-            }
-        })
-    if (ok === true) {
-        my_user_uid = user_uid
-        renderChatter()
-    } else {
-        my_user_uid = ""
-        setVisibility({ objects: [offlinePage] })
+    try {
+        const { ok } = await fetch("/is-online").then((res) => res.json())
+        return ok
+    } catch (error) {
+        return false
     }
 }
 
@@ -286,6 +274,8 @@ logout.onclick = handleLogout
 async function handleLogout() {
     const { loggedOut } = await postData("/logout")
     if (loggedOut === true) {
+        localStorage.removeItem("oauth")
+        sendSWMessage({ type: "logout", data: my_user_uid })
         my_user_uid = ""
         current_conversation_uid = ""
         currentChatter.textContent = "User"
@@ -293,7 +283,6 @@ async function handleLogout() {
         rmElements(currentChattersList)
         setVisibility({ objects: [offlinePage] })
         setVisibility({ show: false, objects: [onlinePage] })
-        sendSWMessage({ type: "logout", data: my_user_uid })
     }
 }
 
@@ -337,10 +326,15 @@ async function handleAddNewChatterSubmit(e) {
 }
 
 // EVENTS THAT RUN AFTER LOGIN
-function renderChatter() {
+async function renderChatter() {
+    const sw = await n.serviceWorker
+    if (sw.controller === null) {
+        connectSocket()
+    } else {
+        sendSWMessage({ type: "login" })
+    }
     setVisibility({ show: false, objects: [offlinePage] })
     setVisibility({ objects: [onlinePage] })
-    sendSWMessage({ type: "login" })
 }
 
 function connectSocket(datetime = "") {
@@ -349,7 +343,12 @@ function connectSocket(datetime = "") {
             window.location.host
     )
     socket.onopen = function (event) {
-        socket.send(JSON.stringify({ type: "init", data: datetime }))
+        socket.send(
+            JSON.stringify({
+                type: "init",
+                data: datetime,
+            })
+        )
     }
     socket.onmessage = function (message) {
         const data = JSON.parse(message.data)
@@ -378,15 +377,23 @@ function connectSocket(datetime = "") {
 
     socket.onclose = (event) => {
         console.log("disconnected")
+        sendSWMessage({ type: "offlineMode" })
     }
 }
 
 function handleInit(data) {
+    logout.textContent = "Logout"
+    logout.onclick = handleLogout
+
     my_user_uid = data.user_uid
     username.textContent = data.username
     sendSWMessage({
         type: "addUser",
-        data: { user_uid: data.user_uid, username: data.username },
+        data: {
+            user_uid: data.user_uid,
+            username: data.username,
+            jwt: data.jwt,
+        },
     })
     rmElements(currentChattersList)
     for (let i = 0; i < data.userConvos.length; i++) {
@@ -547,6 +554,9 @@ async function serviceWorker() {
             let sw = await n.serviceWorker.register("/sw.js", {
                 scope: "/",
             })
+            if (sw.installing) {
+                setVisibility({ objects: [offlinePage] })
+            }
             n.serviceWorker.addEventListener("controllerchange", () => {
                 sw = n.serviceWorker.controller
             })
@@ -557,16 +567,14 @@ async function serviceWorker() {
     }
 }
 
-function handleSWMessage(e) {
+async function handleSWMessage(e) {
     const { type, data } = e.data
 
     if (type === "login") {
         if (data === undefined) {
             connectSocket()
         } else {
-            my_user_uid = data?.user_uid
-            username.textContent = data?.username
-            connectSocket(data?.last)
+            connectSocket(data)
         }
     }
 
@@ -592,20 +600,56 @@ function handleSWMessage(e) {
     }
 
     if (type === "offlineMode") {
-        initDB(data.user_uid, (e) => {
-            db = e.target.result
-            my_user_uid = data.user_uid
-            username.textContent = data.username
-            rmElements(currentChattersList)
-            for (let i = 0; i < data.userConvos.length; i++) {
-                renderCurrentChatter(data.userConvos[i])
-            }
-            setVisibility({
-                show: false,
-                objects: [offlinePage],
-            })
-            setVisibility({ objects: [onlinePage] })
+        my_user_uid = data?.user_uid
+        username.textContent = data?.username
+        rmElements(currentChattersList)
+        for (let i = 0; i < data.userConvos.length; i++) {
+            renderCurrentChatter(data.userConvos[i])
+        }
+        setVisibility({
+            show: false,
+            objects: [offlinePage],
         })
+        setVisibility({ objects: [onlinePage] })
+        logout.textContent = "Reconnect"
+        logout.onclick = function () {
+            sendSWMessage({ type: "reconnect" })
+            // sendSWMessage({ type: "login" })
+        }
+    }
+
+    if (type === "reconnect") {
+        const request = await postData("/reconnect", data)
+        if (request.authenticated === true) {
+            sendSWMessage({ type: "login" })
+        } else {
+            await handleLogout()
+        }
+    }
+
+    if (type === "init") {
+        if (data === undefined) {
+            const oauth = localStorage.getItem("oauth")
+
+            if (oauth === "google" || oauth === "github") {
+                connectSocket()
+                setVisibility({ show: false, objects: [offlinePage] })
+                setVisibility({ objects: [onlinePage] })
+            } else {
+                setVisibility({ objects: [offlinePage] })
+            }
+            return
+        }
+        if (!n.onLine) {
+            sendSWMessage({ type: "offlineMode" })
+            return
+        }
+        const status = await checkOnline()
+        if (status === false) {
+            sendSWMessage({ type: "offlineMode" })
+            return
+        }
+        renderChatter()
     }
 }
 
@@ -617,15 +661,11 @@ async function sendSWMessage(obj = {}) {
 // onload
 async function init() {
     await serviceWorker()
-
-    if (!n.onLine) {
-        sendSWMessage({ type: "offlineMode" })
-    }
+    await sendSWMessage({ type: "init" })
 }
 
 // onload
 
 window.addEventListener("load", function () {
-    checkOnline()
     init()
 })
