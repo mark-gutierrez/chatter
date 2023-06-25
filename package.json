@@ -7,6 +7,9 @@
         "start": "node index.js",
         "dev": "nodemon --ext js,html,css index.js"
     },
+    "engines": {
+        "node": "18.x"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/mark-gutierrez/chatter.git"
