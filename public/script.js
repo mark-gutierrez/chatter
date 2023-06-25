@@ -18,9 +18,6 @@ const popup = qs("#popup")
 const googleLogin = qs("#google-login")
 const githubLogin = qs("#github-login")
 
-googleLogin.onclick = () => localStorage.setItem("oauth", "google")
-githubLogin.onclick = () => localStorage.setItem("oauth", "github")
-
 toggle.onclick = toggleOfflineForm
 function toggleOfflineForm() {
     if (formHeader.innerText === "Login") {
@@ -163,7 +160,7 @@ async function handleOfflineSubmit(e) {
         window.history.pushState({}, d.title, "/")
         if (handler === "/login") {
             offlineForm.reset()
-            renderChatter()
+            window.location.replace("/")
         }
         return
     }
@@ -274,7 +271,6 @@ logout.onclick = handleLogout
 async function handleLogout() {
     const { loggedOut } = await postData("/logout")
     if (loggedOut === true) {
-        localStorage.removeItem("oauth")
         sendSWMessage({ type: "logout", data: my_user_uid })
         my_user_uid = ""
         current_conversation_uid = ""
@@ -629,9 +625,9 @@ async function handleSWMessage(e) {
 
     if (type === "init") {
         if (data === undefined) {
-            const oauth = localStorage.getItem("oauth")
+            const request = await fetch("/is-online").then((res) => res.json())
 
-            if (oauth === "google" || oauth === "github") {
+            if (request.ok === true) {
                 connectSocket()
                 setVisibility({ show: false, objects: [offlinePage] })
                 setVisibility({ objects: [onlinePage] })
